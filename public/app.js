@@ -1,3 +1,4 @@
+import { motion } from './motion.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const money = value => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -51,9 +52,7 @@ function navigationHref(item) { return `#${collectionIds.includes(item.id) ? 'co
 function closeCategories(restoreFocus = false) {
   const toggle = $('#category-toggle'), panel = $('#category-panel');
   if (!toggle || !panel) return;
-  toggle.setAttribute('aria-expanded', 'false');
-  panel.hidden = true;
-  if (restoreFocus) toggle.focus();
+  motion.disclosure(toggle, panel, false, { restoreFocus });
 }
 async function api(url, options = {}) {
   const response = await fetch('/api' + url, { ...options, headers: { 'Content-Type': 'application/json', ...(me.csrf ? { 'X-CSRF-Token': me.csrf } : {}), ...options.headers }, body: options.body ? JSON.stringify(options.body) : undefined });
@@ -61,22 +60,20 @@ async function api(url, options = {}) {
   if (!response.ok) throw Error(data.error || 'Không thể xử lý yêu cầu.');
   return data;
 }
-function toast(message) {
-  $('#toast').textContent = message;
-  $('#toast').style.display = 'block';
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => $('#toast').style.display = 'none', 4000);
-}
+function toast(message) { motion.showToast($('#toast'), message); }
 function saveCart() { localStorage.setItem('sn-cart', JSON.stringify(cart)); }
-function add(id, quantity = 1) {
+function add(id, quantity = 1, source = null) {
   const product = products.find(item => item.id === id);
   if (!product?.stock) return toast('Sản phẩm đã hết hàng.');
   const item = cart.find(line => line.id === id);
   if (!Number.isSafeInteger(quantity) || quantity < 1 || (item?.quantity || 0) + quantity > Math.min(product.stock, 99)) return toast('Số lượng vượt quá tồn kho hoặc giới hạn 99 sản phẩm.');
   if (item) item.quantity += quantity; else cart.push({ id, quantity });
   saveCart();
+  const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+  document.querySelectorAll('.cart-count').forEach(element => element.textContent = count);
+  $('.cart-link')?.setAttribute('aria-label', `${config.labels.cart}: ${count}`);
   toast('Đã thêm vào giỏ hàng');
-  render();
+  motion.addedToCart(source);
 }
 function applyCopy(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -89,8 +86,8 @@ function applyCopy(root) {
 }
 function modal(html) {
   $('#modal').innerHTML = `<button class="modal-close" aria-label="Đóng">${icon('close')}</button>` + html;
-  if (!$('#modal').open) $('#modal').showModal();
-  $('#modal .modal-close').onclick = () => $('#modal').close();
+  motion.openDialog($('#modal'));
+  $('#modal .modal-close').onclick = () => motion.closeDialog($('#modal'));
 }
 function header() {
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -230,7 +227,7 @@ function editProduct(product = { name: '', category: config.categories[0] || '',
       body.details.specifications = lines(data.detail_specifications).map(line => { const index = line.indexOf(':'); if (index < 1 || !line.slice(index + 1).trim()) throw Error('Mỗi thông số cần có dạng “Tên: giá trị”.'); return { label: line.slice(0, index).trim(), value: line.slice(index + 1).trim() }; });
       body.details.is_sample = data.detail_is_sample === '1';
       await api('/admin/products' + (product.id ? '/' + product.id : ''), { method: product.id ? 'PUT' : 'POST', body });
-      $('#modal').close();
+      await motion.closeDialog($('#modal'));
       await refresh();
       toast('Đã lưu sản phẩm');
     });
@@ -238,12 +235,28 @@ function editProduct(product = { name: '', category: config.categories[0] || '',
 }
 async function submit(form, action) {
   const button = form.querySelector('button[type="submit"],button.primary');
-  button.disabled = true;
+  if (form.dataset.submitting === 'true' || button?.disabled) return;
+  form.dataset.submitting = 'true';
+  form.setAttribute('aria-busy', 'true');
+  if (button) {
+    button.disabled = true;
+    button.classList.add('is-pending');
+    button.setAttribute('aria-busy', 'true');
+  }
   form.querySelector('.error')?.replaceChildren();
-  try { await action(); } catch (error) { const target = form.querySelector('.error'); if (target) target.textContent = error.message; else toast(error.message); } finally { button.disabled = false; }
+  try { await action(); }
+  catch (error) {
+    const target = form.querySelector('.error');
+    if (target) { target.textContent = error.message; motion.formError(form); }
+    else toast(error.message);
+  } finally {
+    delete form.dataset.submitting;
+    form.removeAttribute('aria-busy');
+    if (button) { button.disabled = false; button.classList.remove('is-pending'); button.removeAttribute('aria-busy'); }
+  }
 }
 async function refresh() { [config, products] = await Promise.all([api('/settings'), api('/products')]); await render(); }
-let generation = 0;
+let generation = 0, lastRenderedRoute;
 async function render() {
   const current = ++generation;
   try {
@@ -257,6 +270,8 @@ async function render() {
     $('#app').innerHTML = header() + body + footer();
     if (route !== 'admin') applyCopy($('#app'));
     bind();
+    motion.enhancePage($('#app'), route !== lastRenderedRoute);
+    lastRenderedRoute = route;
   } catch (error) { toast(error.message); }
 }
 function bindUploads(root) {
@@ -265,14 +280,14 @@ function bindUploads(root) {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) return toast('Ảnh tối đa 5 MB.');
     const buttons = [...root.querySelectorAll('button.primary')];
-    buttons.forEach(button => button.disabled = true);
+    buttons.forEach(button => { button.disabled = true; button.classList.add('is-pending'); button.setAttribute('aria-busy', 'true'); });
     try {
       const response = await fetch('/api/admin/upload', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-CSRF-Token': me.csrf }, body: file });
       const data = await response.json();
       if (!response.ok) throw Error(data.error);
       root.querySelector('[name="' + input.dataset.upload + '"]').value = data.url;
       toast('Đã tải ảnh. Nhấn Lưu để áp dụng.');
-    } catch (error) { toast(error.message); } finally { buttons.forEach(button => button.disabled = false); }
+    } catch (error) { toast(error.message); } finally { buttons.forEach(button => { button.disabled = false; button.classList.remove('is-pending'); button.removeAttribute('aria-busy'); }); }
   });
 }
 function bindEditorRemove() { document.querySelectorAll('[data-remove-entry]').forEach(button => button.onclick = () => button.closest('fieldset').remove()); }
@@ -281,26 +296,24 @@ function bind() {
     $('#category-toggle').onclick = () => {
       const toggle = $('#category-toggle'), panel = $('#category-panel');
       const open = toggle.getAttribute('aria-expanded') !== 'true';
-      toggle.setAttribute('aria-expanded', String(open));
-      panel.hidden = !open;
+      motion.disclosure(toggle, panel, open);
     };
     $('#category-toggle').onkeydown = event => {
       if (event.key !== 'ArrowDown') return;
       event.preventDefault();
-      $('#category-toggle').setAttribute('aria-expanded', 'true');
-      $('#category-panel').hidden = false;
+      motion.disclosure($('#category-toggle'), $('#category-panel'), true);
       $('#category-panel a')?.focus();
     };
   }
   if ($('#settings')) bindUploads($('#settings'));
   $('#search').onsubmit = event => { event.preventDefault(); query = new FormData(event.currentTarget).get('q').trim(); location.hash = 'products'; render(); };
   document.querySelectorAll('[data-category],[data-filter]').forEach(button => button.onclick = () => { category = button.dataset.category ?? button.dataset.filter; if (location.hash !== '#products') location.hash = 'products'; else render(); });
-  document.querySelectorAll('[data-add]').forEach(button => button.onclick = () => add(Number(button.dataset.add)));
+  document.querySelectorAll('[data-add]').forEach(button => button.onclick = () => add(Number(button.dataset.add), 1, button));
   document.querySelectorAll('[data-policy]').forEach(button => button.onclick = () => { const policy = config.policies[Number(button.dataset.policy)]; modal(`<span class="eyebrow">${esc(config.brand)}</span><h2>${esc(policy.title)}</h2><p class="policy">${esc(policy.body)}</p>`); });
   document.querySelectorAll('[data-article]').forEach(button => button.onclick = () => { const article = editorial().journal.articles[Number(button.dataset.article)]; modal(`<img class="article-modal-image" src="${esc(article.image)}" alt="${esc(article.title)}"><span class="eyebrow">${esc(editorial().journal.eyebrow)}</span><h2>${esc(article.title)}</h2><p class="article-intro">${esc(article.excerpt)}</p><p class="policy">${esc(article.body)}</p>`); });
-  document.querySelectorAll('[data-gallery]').forEach(button => button.onclick = () => { $('#gallery-main-image').src = button.dataset.gallery; document.querySelectorAll('[data-gallery]').forEach(item => item.classList.toggle('active', item === button)); });
-  document.querySelectorAll('[data-step]').forEach(button => button.onclick = () => { const input = $('#detail-quantity'); input.value = Math.min(Number(input.max), Math.max(1, Number(input.value) + Number(button.dataset.step))); });
-  if ($('#detail-add')) $('#detail-add').onclick = event => add(Number(event.currentTarget.dataset.productId), Number($('#detail-quantity').value));
+  document.querySelectorAll('[data-gallery]').forEach(button => button.onclick = () => { $('#gallery-main-image').src = button.dataset.gallery; motion.imageChanged($('#gallery-main-image')); document.querySelectorAll('[data-gallery]').forEach(item => item.classList.toggle('active', item === button)); });
+  document.querySelectorAll('[data-step]').forEach(button => button.onclick = () => { const input = $('#detail-quantity'); input.value = Math.min(Number(input.max), Math.max(1, Number(input.value) + Number(button.dataset.step))); motion.quantityChanged(input); });
+  if ($('#detail-add')) $('#detail-add').onclick = event => add(Number(event.currentTarget.dataset.productId), Number($('#detail-quantity').value), event.currentTarget);
   if ($('#sort-products')) $('#sort-products').onchange = event => { sort = event.target.value; render(); };
   if ($('#price-filter')) $('#price-filter').onchange = event => { priceRange = event.target.value; render(); };
   if ($('#reset-filters')) $('#reset-filters').onclick = () => { query = ''; category = ''; priceRange = ''; render(); };
@@ -314,7 +327,7 @@ function bind() {
   document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { adminTab = button.dataset.tab; render(); });
   if ($('#new-product')) $('#new-product').onclick = () => editProduct();
   document.querySelectorAll('[data-edit]').forEach(button => button.onclick = () => editProduct(adminPage.products.find(product => product.id === Number(button.dataset.edit))));
-  document.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => { modal('<h2>Xóa sản phẩm?</h2><p>Đơn hàng đã đặt vẫn giữ thông tin sản phẩm.</p><button id="confirm-delete" class="primary">Xác nhận xóa</button>'); $('#confirm-delete').onclick = async () => { try { await api('/admin/products/' + button.dataset.delete, { method: 'DELETE' }); $('#modal').close(); await refresh(); toast('Đã xóa sản phẩm'); } catch (error) { toast(error.message); } }; });
+  document.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => { modal('<h2>Xóa sản phẩm?</h2><p>Đơn hàng đã đặt vẫn giữ thông tin sản phẩm.</p><button id="confirm-delete" class="primary">Xác nhận xóa</button>'); $('#confirm-delete').onclick = () => submit($('#modal'), async () => { await api('/admin/products/' + button.dataset.delete, { method: 'DELETE' }); await motion.closeDialog($('#modal')); await refresh(); toast('Đã xóa sản phẩm'); }); });
   bindEditorRemove();
   if ($('#add-category-editor')) $('#add-category-editor').onclick = () => { $('#category-editors').insertAdjacentHTML('beforeend', categoryEditor()); bindEditorRemove(); };
   if ($('#add-article-editor')) $('#add-article-editor').onclick = () => { $('#article-editors').insertAdjacentHTML('beforeend', articleEditor()); bindEditorRemove(); };
@@ -354,9 +367,10 @@ function bind() {
       toast('Đã lưu nội dung');
     });
   };
-  document.querySelectorAll('.order-status').forEach(form => form.onsubmit = async event => { event.preventDefault(); try { await api('/admin/orders/' + form.dataset.id, { method: 'PATCH', body: { status: new FormData(form).get('status') } }); await render(); toast('Đã cập nhật đơn hàng'); } catch (error) { toast(error.message); } });
+  document.querySelectorAll('.order-status').forEach(form => form.onsubmit = event => { event.preventDefault(); submit(form, async () => { await api('/admin/orders/' + form.dataset.id, { method: 'PATCH', body: { status: new FormData(form).get('status') } }); await render(); toast('Đã cập nhật đơn hàng'); }); });
 }
+motion.installDialog($('#modal'));
 document.addEventListener('click', event => { if (!event.target.closest('.category-menu')) closeCategories(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && $('#category-toggle')?.getAttribute('aria-expanded') === 'true') closeCategories(true); });
-window.addEventListener('hashchange', () => { render(); window.scrollTo({ top: 0, behavior: 'instant' }); });
+window.addEventListener('hashchange', () => { motion.closeDialog($('#modal'), { immediate: true }); render(); window.scrollTo({ top: 0, behavior: 'instant' }); });
 try { [config, products, me] = await Promise.all([api('/settings'), api('/products'), api('/me')]); await render(); } catch (error) { $('#app').innerHTML = `<main class="wrap page"><h1>Không thể tải cửa hàng</h1><p>${esc(error.message)}</p><button id="reload" class="primary">Thử lại</button></main>`; $('#reload').onclick = () => location.reload(); }

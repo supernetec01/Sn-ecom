@@ -61,6 +61,12 @@ Bộ 16 sản phẩm, thông số kỹ thuật, giá, tồn kho, bài viết và
 - Trạng thái admin, sản phẩm và nội dung lưu trong SQLite; không phụ thuộc localStorage. localStorage chỉ giữ ID và số lượng giỏ hàng, máy chủ tính lại toàn bộ giá.
 - Sao lưu bằng SQLite backup API/`.backup` hoặc snapshot nhất quán khi dừng máy chủ; sao lưu cùng thư mục uploads. Không sao chép riêng tệp SQLite đang chạy ở chế độ WAL. Thử khôi phục trước khi vận hành.
 
+## Hiệu ứng tương tác
+
+Giao diện dùng CSS và Web Animations API cho phản hồi nút bấm, menu danh mục, cửa sổ nội dung, giỏ hàng, thông báo và nội dung khi cuộn. Thêm sản phẩm giữ nguyên vị trí cuộn và phần tử đang được chọn. Nút gửi hiển thị trạng thái xử lý và khóa gửi lặp khi yêu cầu đang chạy.
+
+Thiết lập **Giảm chuyển động / Reduce motion** trên thiết bị được tôn trọng ngay khi thay đổi. Nội dung vẫn hiển thị và thao tác hoạt động khi hiệu ứng được giảm; không cần cấu hình database hoặc cài thư viện giao diện bổ sung.
+
 ## Kiểm tra và bảo mật
 
 `npm test` chạy kiểm thử HTTP với DB tạm riêng: đăng nhập, phân quyền, CSRF/origin, đơn hàng riêng theo tài khoản, sửa giá phía client, tồn kho, chuyển khoản và thao tác admin. Kiểm thử dữ liệu mẫu bao gồm nâng cấp SQLite cũ, giữ nguyên nội dung đã sửa, không khôi phục mẫu đã xóa, rollback khi lỗi giữa chừng, CRUD thông tin sản phẩm và kiểm tra cấu hình nội dung lồng nhau. Mật khẩu dùng scrypt + salt; session token ngẫu nhiên lưu dạng hash, cookie HttpOnly/SameSite; SQL dùng tham số; nội dung render dạng text; Helmet/CSP, giới hạn yêu cầu và xác thực dữ liệu đầu vào.
