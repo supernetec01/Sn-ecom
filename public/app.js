@@ -293,15 +293,53 @@ function bindUploads(root) {
 function bindEditorRemove() { document.querySelectorAll('[data-remove-entry]').forEach(button => button.onclick = () => button.closest('fieldset').remove()); }
 function bind() {
   if ($('#category-toggle')) {
-    $('#category-toggle').onclick = () => {
-      const toggle = $('#category-toggle'), panel = $('#category-panel');
-      const open = toggle.getAttribute('aria-expanded') !== 'true';
-      motion.disclosure(toggle, panel, open);
+    const toggle = $('#category-toggle'), panel = $('#category-panel'), menu = toggle.closest('.category-menu');
+    const canHover = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
+    let closeTimer, openedByHover = false;
+    const cancelClose = () => clearTimeout(closeTimer);
+    menu.onpointerenter = event => {
+      if (event.pointerType !== 'mouse' || !canHover.matches) return;
+      cancelClose();
+      if (toggle.getAttribute('aria-expanded') !== 'true') {
+        openedByHover = true;
+        motion.disclosure(toggle, panel, true);
+      }
     };
-    $('#category-toggle').onkeydown = event => {
+    menu.onpointerleave = event => {
+      if (event.pointerType !== 'mouse' || !canHover.matches) return;
+      cancelClose();
+      // Brief grace period bridges the space between the trigger and its panel.
+      closeTimer = setTimeout(() => {
+        if (!menu.isConnected || panel.contains(document.activeElement)) return;
+        openedByHover = false;
+        motion.disclosure(toggle, panel, false);
+      }, 180);
+    };
+    menu.onfocusout = () => queueMicrotask(() => {
+      if (menu.isConnected && !menu.contains(document.activeElement) && !menu.matches(':hover')) {
+        cancelClose();
+        openedByHover = false;
+        motion.disclosure(toggle, panel, false);
+      }
+    });
+    toggle.onclick = event => {
+      cancelClose();
+      const open = toggle.getAttribute('aria-expanded') === 'true';
+      // A click following mouse entry keeps the newly opened list available.
+      const mouseClick = event.detail > 0 && (event.pointerType === 'mouse' || (!event.pointerType && toggle.matches(':hover')));
+      if (mouseClick && canHover.matches && openedByHover && open) {
+        openedByHover = false;
+        return;
+      }
+      openedByHover = false;
+      motion.disclosure(toggle, panel, !open);
+    };
+    toggle.onkeydown = event => {
       if (event.key !== 'ArrowDown') return;
       event.preventDefault();
-      motion.disclosure($('#category-toggle'), $('#category-panel'), true);
+      cancelClose();
+      openedByHover = false;
+      motion.disclosure(toggle, panel, true);
       $('#category-panel a')?.focus();
     };
   }
