@@ -1,3 +1,4 @@
+import { migrateCommerce } from './commerce-store.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -114,6 +115,7 @@ export function openStore(dir=process.env.DATA_DIR || './data') {
  CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,description TEXT NOT NULL,price INTEGER NOT NULL CHECK(price>=0),stock INTEGER NOT NULL CHECK(stock>=0),image TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,details TEXT NOT NULL DEFAULT '{}');
  CREATE TABLE IF NOT EXISTS demo_catalog_seed(sku TEXT PRIMARY KEY,product_id INTEGER);
+ CREATE TABLE IF NOT EXISTS checkout_requests(user_id INTEGER NOT NULL REFERENCES users(id),request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,response TEXT NOT NULL,PRIMARY KEY(user_id,request_key));
  CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),created TEXT NOT NULL,status TEXT NOT NULL,total INTEGER NOT NULL,shipping INTEGER NOT NULL,payment TEXT NOT NULL,recipient TEXT NOT NULL,address TEXT NOT NULL,phone TEXT NOT NULL,items TEXT NOT NULL,bank TEXT NOT NULL);
  `);
  if (!db.prepare('PRAGMA table_info(products)').all().some(column => column.name === 'details')) db.exec("ALTER TABLE products ADD COLUMN details TEXT NOT NULL DEFAULT '{}'");
@@ -132,5 +134,6 @@ export function openStore(dir=process.env.DATA_DIR || './data') {
  if(!Object.hasOwn(existing,'navigation')){existing.navigation=defaultNavigation;changed=true;}
  if(changed)db.prepare('UPDATE settings SET value=? WHERE id=1').run(JSON.stringify(existing));
  if(initialized.changes && db.prepare('SELECT COUNT(*) AS count FROM products').get().count===0) seedDemoCatalog(db);
+ migrateCommerce(db);
  return db;
 }

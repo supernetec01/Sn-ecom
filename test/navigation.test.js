@@ -1,3 +1,4 @@
+import { decorateProduct } from '../commerce-store.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -146,7 +147,7 @@ test('Bestsellers ranks only completed quantities of active products and exposes
   const response = await request('/collections/bestsellers');
   assert.equal(response.status, 200);
   assert.deepEqual(response.data.map(product => product.id), [second.id, tied.id, first.id]);
-  const expected = [second.id, tied.id, first.id].map(id => readProduct(db.prepare('SELECT * FROM products WHERE id=?').get(id)));
+  const expected = [second.id, tied.id, first.id].map(id => decorateProduct(db,db.prepare('SELECT * FROM products WHERE id=?').get(id),readProduct));
   assert.deepEqual(response.data, expected);
   assert.equal(typeof response.data[0].details, 'object');
   for (const privateValue of ['private-buyer', 'private-other', 'Private recipient', 'Private shipping address', '0901234567', 'private-bank-account', 'user_id', 'sold_quantity']) assert.equal(response.text.includes(privateValue), false);

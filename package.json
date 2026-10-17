@@ -11,11 +11,20 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "admin": "node scripts/admin.js",
-    "seed:demo": "node scripts/seed-demo.js"
+    "seed:demo": "node scripts/seed-demo.js",
+    "outbox": "node scripts/process-outbox.js",
+    "backup": "node scripts/backup.js",
+    "maintenance": "node scripts/maintenance.js",
+    "test:browser": "node scripts/browser-smoke.cjs",
+    "addresses:update": "node --use-env-proxy scripts/update-vietnam-addresses.js"
   },
   "dependencies": {
     "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
-    "express-rate-limit": "^8.1.0"
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
   }
 }

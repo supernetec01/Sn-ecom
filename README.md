@@ -82,3 +82,17 @@ DevTools/Network không thể bị cấm đáng tin cậy. Việc sửa request 
 - Phân trang/tìm kiếm máy chủ và DB phục vụ nhiều instance khi quy mô tăng. Bản hiện tại phục vụ một instance Node với SQLite.
 
 Không lưu khóa thanh toán hoặc mật khẩu vào nội dung admin, mã nguồn hoặc chat. Trang cấu hình ngân hàng chỉ chứa thông tin nhận chuyển khoản công khai.
+
+## Chống gửi lặp checkout
+
+Giao diện tạo `Idempotency-Key` cho từng nội dung đặt hàng và giữ mã trong sessionStorage khi yêu cầu lỗi để lần thử lại nhận cùng đơn. Máy chủ lưu kết quả trong SQLite cùng transaction trừ tồn kho: cùng tài khoản, mã và nội dung trả lại đơn cũ (HTTP 200); dùng lại mã cho nội dung khác trả HTTP 409. Lần mua mới dùng mã mới. Client API khác phải gửi header này để được bảo vệ; request không có mã vẫn được hỗ trợ để tương thích.
+
+Số điện thoại được bỏ khoảng trắng, dấu ngoặc và dấu gạch ngang, sau đó yêu cầu 9–15 chữ số, có thể có dấu `+` đầu. Đây là kiểm tra định dạng, chưa xác minh chủ sở hữu số điện thoại.
+
+## Bản nâng cấp bán hàng
+
+Đã bổ sung quản trị bán hàng (`#manage`), thanh toán/đối soát, vận đơn, đổi trả, lịch sử kho, biến thể, mã giảm giá, Rewards tùy chọn, mua không cần tài khoản, hồ sơ/MFA, đánh giá người mua, CSV, SEO và trợ lý sản phẩm. Xem [hướng dẫn vận hành và cấu hình dịch vụ ngoài](docs/commerce-upgrade.md) để biết tính năng hiện có, quy tắc và phần chưa kết nối.
+
+`npm run test:browser` chạy luồng người dùng bằng Playwright trên DB tạm. `npm run backup -- <thư-mục>` sao lưu SQLite/uploads. Email dùng hàng đợi và cần worker; AI/VNPay chỉ hoạt động sau khi cấu hình khóa/tài khoản phù hợp. Các ghi chú “chưa có” ở phần bản 0.2 phía trên mô tả trước nâng cấp; tài liệu mới là nguồn chi tiết cho bản hiện tại.
+
+Địa chỉ giao hàng chỉ tại Việt Nam, chọn Tỉnh/thành phố → Phường/xã/đặc khu theo bộ dữ liệu mới lưu trong ứng dụng. Xem [nguồn dữ liệu và cách cập nhật](docs/vietnam-addresses.md). Địa chỉ cũ không bị ghi đè; cần chọn lại tỉnh/xã khi dùng cho đơn mới.
