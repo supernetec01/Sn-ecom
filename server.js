@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { openStore, hashPassword, checkPassword, readProduct, defaultEditorial } from './store.js';
+import { navigationValid } from './navigation.js';
 const str=(v,max=500)=>typeof v==='string'&&v.length<=max;
 const integer=(v,max=1e9)=>Number.isSafeInteger(v)&&v>=0&&v<=max;
 const safeImage=v=>str(v,2000)&&(v===''||/^\/(?!\/)[\w./-]+$/.test(v)||/^https:\/\/[^\s]+$/.test(v));
@@ -56,6 +57,18 @@ export function createApp(db=openStore()) {
  const loginLimit=rateLimit({windowMs:900000,limit:20,standardHeaders:'draft-8',legacyHeaders:false,message:{error:'Thử lại sau ít phút.'}});
  app.get('/api/settings',(req,res)=>res.json(settings()));
  app.get('/api/products',(req,res)=>res.json(db.prepare('SELECT * FROM products WHERE active=1 ORDER BY id DESC').all().map(readProduct)));
+ // Return product records only: order contents and customer information stay private.
+ app.get('/api/collections/bestsellers',(req,res)=>res.json(db.prepare(`
+  SELECT p.* FROM orders AS o
+  JOIN json_each(o.items) AS line
+  JOIN products AS p ON p.id=json_extract(line.value,'$.id')
+  WHERE o.status='completed' AND p.active=1
+   AND json_type(line.value,'$.id')='integer'
+   AND json_type(line.value,'$.quantity')='integer'
+   AND json_extract(line.value,'$.quantity')>0
+  GROUP BY p.id
+  ORDER BY SUM(json_extract(line.value,'$.quantity')) DESC,p.id DESC
+ `).all().map(readProduct)));
  app.get('/api/products/:id',(req,res)=>{
   const row=db.prepare('SELECT * FROM products WHERE id=? AND active=1').get(req.params.id);
   return row?res.json(readProduct(row)):fail(res,'Không tìm thấy sản phẩm.',404);
@@ -80,7 +93,8 @@ export function createApp(db=openStore()) {
  app.post('/api/admin/products',csrf,product,(req,res)=>{const p=req.body;const r=db.prepare('INSERT INTO products(name,category,description,price,stock,image,active,details) VALUES(?,?,?,?,?,?,?,?)').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,JSON.stringify(p.details??{}));res.status(201).json({id:Number(r.lastInsertRowid)});});
  app.put('/api/admin/products/:id',csrf,product,(req,res)=>{const p=req.body;const r=db.prepare('UPDATE products SET name=?,category=?,description=?,price=?,stock=?,image=?,active=?,details=COALESCE(?,details) WHERE id=?').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,p.details===undefined?null:JSON.stringify(p.details),req.params.id);r.changes?res.json({ok:true}):fail(res,'Không tìm thấy sản phẩm.',404);});
  app.delete('/api/admin/products/:id',csrf,(req,res)=>{db.prepare('DELETE FROM products WHERE id=?').run(req.params.id);res.json({ok:true});});
- app.put('/api/admin/settings',csrf,(req,res)=>{const s=req.body,old=settings();if(Object.keys(s).sort().join()!==Object.keys(old).sort().join())return fail(res,'Cần giữ đúng các trường cấu hình.');for(const k of Object.keys(old)){if(typeof old[k]==='string'&&!str(s[k],10000))return fail(res,`Trường ${k} không hợp lệ.`);}if(!integer(s.shippingFee,1e7)||!integer(s.freeShipping,1e9)||!safeImage(s.logo)||!safeImage(s.heroImage)||!Array.isArray(s.categories)||s.categories.length>50||!s.categories.every(c=>str(c,100)&&c.trim())||!Array.isArray(s.benefits)||s.benefits.length>10||!s.benefits.every(c=>str(c,200))||!Array.isArray(s.policies)||s.policies.length>20||!s.policies.every(p=>p&&str(p.title,100)&&str(p.body,10000)))return fail(res,'Cấu hình không hợp lệ.');if(!editorialValid(s.editorial))return fail(res,'Nội dung bộ sưu tập, câu chuyện hoặc bài viết không hợp lệ.');if(!s.ui||Object.keys(s.ui).sort().join()!==Object.keys(old.ui).sort().join()||!Object.values(s.ui).every(v=>str(v,500)))return fail(res,'Nội dung giao diện không hợp lệ.');if(!s.colors||Object.keys(old.colors).some(k=>!/^#[0-9a-f]{6}$/i.test(s.colors[k]))||!s.labels||Object.keys(s.labels).sort().join()!==Object.keys(old.labels).sort().join()||!Object.values(s.labels).every(v=>str(v,200)))return fail(res,'Màu sắc hoặc nhãn giao diện không hợp lệ.');db.prepare('UPDATE settings SET value=? WHERE id=1').run(JSON.stringify(s));res.json({ok:true});});
+ app.get('/api/admin/settings',(req,res)=>res.json(settings()));
+ app.put('/api/admin/settings',csrf,(req,res)=>{const s=req.body,old=settings();if(Object.keys(s).sort().join()!==Object.keys(old).sort().join())return fail(res,'Cần giữ đúng các trường cấu hình.');for(const k of Object.keys(old)){if(typeof old[k]==='string'&&!str(s[k],10000))return fail(res,`Trường ${k} không hợp lệ.`);}if(!integer(s.shippingFee,1e7)||!integer(s.freeShipping,1e9)||!safeImage(s.logo)||!safeImage(s.heroImage)||!Array.isArray(s.categories)||s.categories.length>50||!s.categories.every(c=>str(c,100)&&c.trim())||!Array.isArray(s.benefits)||s.benefits.length>10||!s.benefits.every(c=>str(c,200))||!Array.isArray(s.policies)||s.policies.length>20||!s.policies.every(p=>p&&str(p.title,100)&&str(p.body,10000)))return fail(res,'Cấu hình không hợp lệ.');if(!editorialValid(s.editorial))return fail(res,'Nội dung bộ sưu tập, câu chuyện hoặc bài viết không hợp lệ.');if(!navigationValid(s.navigation))return fail(res,'Nội dung thanh điều hướng không hợp lệ.');if(!s.ui||Object.keys(s.ui).sort().join()!==Object.keys(old.ui).sort().join()||!Object.values(s.ui).every(v=>str(v,500)))return fail(res,'Nội dung giao diện không hợp lệ.');if(!s.colors||Object.keys(old.colors).some(k=>!/^#[0-9a-f]{6}$/i.test(s.colors[k]))||!s.labels||Object.keys(s.labels).sort().join()!==Object.keys(old.labels).sort().join()||!Object.values(s.labels).every(v=>str(v,200)))return fail(res,'Màu sắc hoặc nhãn giao diện không hợp lệ.');db.prepare('UPDATE settings SET value=? WHERE id=1').run(JSON.stringify(s));res.json({ok:true});});
  app.get('/api/admin/orders',(req,res)=>res.json(db.prepare('SELECT * FROM orders ORDER BY id DESC').all().map(o=>({...o,items:JSON.parse(o.items),bank:JSON.parse(o.bank)}))));
  app.patch('/api/admin/orders/:id',csrf,(req,res)=>{const status=req.body.status;if(!['pending','confirmed','shipped','completed','cancelled'].includes(status))return fail(res,'Trạng thái không hợp lệ.');db.exec('BEGIN IMMEDIATE');try{const order=db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);if(!order){db.exec('ROLLBACK');return fail(res,'Không có đơn hàng.',404);}const allowed={pending:['confirmed','cancelled'],confirmed:['shipped','cancelled'],shipped:['completed'],completed:[],cancelled:[]};if(!allowed[order.status].includes(status)){db.exec('ROLLBACK');return fail(res,'Không thể chuyển sang trạng thái này.');}if(status==='cancelled')for(const i of JSON.parse(order.items))db.prepare('UPDATE products SET stock=stock+? WHERE id=?').run(i.quantity,i.id);db.prepare('UPDATE orders SET status=? WHERE id=?').run(status,req.params.id);db.exec('COMMIT');res.json({ok:true});}catch(e){db.exec('ROLLBACK');throw e;}});
  app.use('/api',(req,res)=>fail(res,'Không tìm thấy API.',404));
