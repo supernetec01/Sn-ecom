@@ -101,7 +101,7 @@ Số điện thoại được bỏ khoảng trắng, dấu ngoặc và dấu g�
 
 Đã hợp nhất quản trị bán hàng và nội dung tại `#admin` (giữ tương thích đường dẫn `#manage`), thanh toán/đối soát, vận đơn, đổi trả, lịch sử kho, biến thể, mã giảm giá, Rewards tùy chọn, mua không cần tài khoản, hồ sơ/MFA, đánh giá người mua, CSV, SEO và trợ lý sản phẩm. Xem [hướng dẫn vận hành và cấu hình dịch vụ ngoài](docs/commerce-upgrade.md) để biết tính năng hiện có, quy tắc và phần chưa kết nối.
 
-`npm run test:browser` chạy luồng người dùng bằng Playwright trên DB tạm. `npm run backup -- <thư-mục>` sao lưu SQLite/uploads. Email dùng hàng đợi và cần worker; AI/VNPay chỉ hoạt động sau khi cấu hình khóa/tài khoản phù hợp. Các ghi chú “chưa có” ở phần bản 0.2 phía trên mô tả trước nâng cấp; tài liệu mới là nguồn chi tiết cho bản hiện tại.
+`npm run test:browser` chạy luồng người dùng bằng Playwright trên DB tạm. `npm run test:storefront` kiểm tra đồng bộ danh mục giữa các tab/trình duyệt và giữ nội dung checkout. `npm run backup -- <thư-mục>` sao lưu SQLite/uploads. Email dùng hàng đợi và cần worker; AI/VNPay chỉ hoạt động sau khi cấu hình khóa/tài khoản phù hợp. Các ghi chú “chưa có” ở phần bản 0.2 phía trên mô tả trước nâng cấp; tài liệu mới là nguồn chi tiết cho bản hiện tại.
 
 Địa chỉ giao hàng chỉ tại Việt Nam, chọn Tỉnh/thành phố → Phường/xã/đặc khu theo bộ dữ liệu mới lưu trong ứng dụng. Xem [nguồn dữ liệu và cách cập nhật](docs/vietnam-addresses.md). Địa chỉ cũ không bị ghi đè; cần chọn lại tỉnh/xã khi dùng cho đơn mới.
 

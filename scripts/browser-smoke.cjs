@@ -19,6 +19,20 @@ const {once}=require('node:events');
   const chooseAddress=async(form,province='01',ward='00004')=>{await form.locator('[name=province_code]').selectOption(province);await form.locator('[name=ward_code] option[value="'+ward+'"]').waitFor({state:'attached'});await form.locator('[name=ward_code]').selectOption(ward);};
   const route=async hash=>{await page.evaluate(x=>location.hash=x,hash);await page.waitForTimeout(150);};
   await page.goto(base);await page.locator('.hero').waitFor();await page.evaluate(()=>localStorage.setItem('sn-cart','[null,{},"bad"]'));await page.reload();await page.locator('.hero').waitFor();console.log('PASS corrupted cart recovery');
+  for(const width of [1440,768,375]){
+    await page.setViewportSize({width,height:900});
+    await page.evaluate(()=>window.scrollTo({top:1400,behavior:'instant'}));
+    await page.waitForFunction(()=>scrollY>500);
+    const header=await page.locator('.header').boundingBox();
+    assert.ok(header.y>=0&&header.y+header.height<900,`${width}: header left the viewport`);
+    await page.locator('#category-toggle').click();await page.locator('#category-panel').waitFor({state:'visible'});
+    const panel=await page.locator('#category-panel').boundingBox();assert.ok(panel.y>=0&&panel.y+panel.height<=900,`${width}: category panel clipped`);
+    await page.keyboard.press('Escape');await page.locator('#category-panel').waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  }
+  await page.setViewportSize({width:1440,height:900});await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+  console.log('PASS sticky header, usable category panel after scrolling and responsive widths 375/768/1440');
+
   await page.locator('[data-add]').first().click();await route('cart');await page.locator('#checkout').waitFor();assert.equal(await page.locator('#checkout [name=province_code] option').count(),35);assert.equal(await page.locator('#checkout [name=ward_code]').isDisabled(),true);assert.equal(await page.locator('#checkout [name=country]').inputValue(),'VN');assert.equal(await page.locator('#checkout [name=region]').count(),0);assert.equal(await page.locator('#checkout [name=district_code]').count(),0);await page.locator('#checkout [name=recipient]').fill('Guest tester');await page.locator('#checkout [name=email]').fill('guest@example.test');await chooseAddress(page.locator('#checkout'));
   await page.route('**/api/locations/provinces/79/wards',async r=>{await new Promise(resolve=>setTimeout(resolve,300));await r.continue();});
   await page.selectOption('#checkout [name=province_code]','79');assert.equal(await page.locator('#checkout [name=ward_code]').inputValue(),'');await chooseAddress(page.locator('#checkout'));await page.waitForTimeout(400);assert.equal(await page.locator('#checkout [name=province_code]').inputValue(),'01');assert.equal(await page.locator('#checkout [name=ward_code]').inputValue(),'00004');await page.unroute('**/api/locations/provinces/79/wards');

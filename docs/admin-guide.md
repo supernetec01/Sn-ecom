@@ -19,6 +19,8 @@ Thanh bên chia thành Bán hàng, Nội dung và Thiết lập & nhân sự. M�
 
 Khi có thông báo dữ liệu cấu hình đã được người khác cập nhật, hệ thống từ chối lưu bản cũ. Sao chép phần đang biên tập nếu cần, chọn **Tải lại**, rồi sửa trên dữ liệu mới nhất. Lưu một mục không ghi đè các mục cấu hình khác.
 
+Khi sửa sản phẩm, Enter trong ô nhập một dòng không tự lưu hoặc đóng form; phần mô tả vẫn xuống dòng. Chọn **Lưu sản phẩm** để hoàn tất. Danh mục ngoài cửa hàng được cập nhật khi quay lại tab và định kỳ lúc đang xem; tên đã đổi/xóa không bị giữ lại trong bộ lọc. Xem [kiểm tra giao diện và đồng bộ](ui-fixes-2026-10-19.md).
+
 ## Vai trò và tài khoản
 
 Vào **Tài khoản & phân quyền → Tạo tài khoản**. Dùng tài khoản riêng cho từng nhân viên. Khi chọn vai trò, biểu mẫu hiển thị mô tả quyền; cuối bảng có phần giải thích tất cả vai trò.

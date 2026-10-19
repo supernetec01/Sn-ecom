@@ -60,6 +60,37 @@ function closeCategories(restoreFocus = false) {
   if (!toggle || !panel) return;
   motion.disclosure(toggle, panel, false, { restoreFocus });
 }
+const storeUpdateKey = 'sn-store-updated';
+const isStorefront = route => route === '' || route === 'products' || route === 'inspiration' || /^(product|collection|page)\//.test(route);
+let settingsRead, storeSync;
+function readStoreSettings() {
+  return settingsRead ||= api('/settings').finally(() => { settingsRead = null; });
+}
+function maySyncStorefront() {
+  const route = location.hash.slice(1) || (location.pathname.startsWith('/san-pham/') ? 'product/' : '');
+  return config && isStorefront(route) && document.visibilityState === 'visible' && !$('#modal').open &&
+    !document.activeElement?.closest('input,textarea,select,[contenteditable="true"]');
+}
+async function syncStorefront() {
+  if (!maySyncStorefront() || storeSync) return;
+  storeSync = (async () => {
+    const next = await readStoreSettings();
+    if (maySyncStorefront() && JSON.stringify(next) !== JSON.stringify(config)) await render({ settings: next });
+  })();
+  try { await storeSync; } catch { /* Retry on the next focus or poll; keep the current page usable. */ }
+  finally { storeSync = null; }
+}
+const headerObserver = new ResizeObserver(entries => {
+  for (const entry of entries) if (entry.target.isConnected) {
+    document.documentElement.style.setProperty('--storefront-header-height', Math.ceil(entry.target.getBoundingClientRect().height) + 'px');
+  }
+});
+function watchHeader() {
+  headerObserver.disconnect();
+  const header = $('.storefront-header');
+  document.documentElement.style.setProperty('--storefront-header-height', header ? Math.ceil(header.getBoundingClientRect().height) + 'px' : '0px');
+  if (header) headerObserver.observe(header);
+}
 async function api(url, options = {}) {
   const response = await fetch('/api' + url, { ...options, headers: { 'Content-Type': 'application/json', ...(me.csrf ? { 'X-CSRF-Token': me.csrf } : {}), ...options.headers }, body: options.body ? JSON.stringify(options.body) : undefined });
   const data = await response.json();
@@ -68,6 +99,9 @@ async function api(url, options = {}) {
       me = { user: null }; motion.closeDialog($('#modal')); location.hash = 'account';
     }
     throw Error(data.error || 'Không thể xử lý yêu cầu.');
+  }
+  if (/^\/admin\/(settings|categories)(\/|$)/.test(url) && !['GET','HEAD'].includes(options.method || 'GET')) {
+    try { localStorage.setItem(storeUpdateKey, Date.now() + ':' + Math.random()); } catch {}
   }
   return data;
 }
@@ -100,7 +134,7 @@ function applyCopy(root) {
   }
 }
 function modal(html) {
-  $('#modal').innerHTML = `<button class="modal-close" aria-label="Đóng">${icon('close')}</button>` + html;
+  $('#modal').innerHTML = `<button type="button" class="modal-close" aria-label="Đóng">${icon('close')}</button>` + html;
   motion.openDialog($('#modal'));
   $('#modal .modal-close').onclick = () => motion.closeDialog($('#modal'));
 }
@@ -108,12 +142,12 @@ function header() {
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
   const route = location.hash.slice(1) || (location.pathname.startsWith('/san-pham/') ? 'product/'+Number(location.pathname.split('/')[2].split('-')[0]) : '');
 
-  return `<div class="announcement"><div class="wrap"><span>${esc(config.announcement)}</span><div class="announcement-tools"><a href="#order/0">${ui('Theo dõi đơn hàng')} ${icon('arrow')}</a>${languageControl()}</div></div></div><p class="translation-status" data-translation-status role="status" aria-live="polite" hidden></p>
+  return `<div class="storefront-header"><div class="announcement"><div class="wrap"><span>${esc(config.announcement)}</span><div class="announcement-tools"><a href="#order/0">${ui('Theo dõi đơn hàng')} ${icon('arrow')}</a>${languageControl()}</div></div></div><p class="translation-status" data-translation-status role="status" aria-live="polite" hidden></p>
     <header class="header"><div class="wrap header-inner">
       <a class="brand-link" href="/" aria-label="${esc(config.brand)}"><img class="logo" src="${esc(config.logo)}" alt="${esc(config.brand)}"></a>
       <form class="search" id="search">${icon('search')}<input aria-label="Tìm sản phẩm" name="q" placeholder="${esc(config.searchPlaceholder)}" value="${esc(query)}"><button aria-label="Tìm kiếm">${icon('arrow')}</button></form>
       <div class="header-actions"><a href="#wishlist">${icon('heart')}<span>Yêu thích</span></a><a href="#support">${icon('mail')}<span>Tư vấn</span></a><a href="#account">${icon('user')}<span ${me.user ? 'data-original-content' : ''}>${me.user ? esc(me.user.name) : label('account')}</span></a><a class="cart-link" href="#cart">${icon('bag')}<span>${label('cart')}</span><b class="cart-count">${count}</b></a></div>
-    </div><div class="nav-shell"><div class="wrap nav-frame"><div class="category-menu"><button class="category-toggle ${route === 'products' ? 'active' : ''}" id="category-toggle" aria-expanded="false" aria-controls="category-panel">${icon('menu')}<span>${esc(navigation().categoryLabel)}</span>${icon('down')}</button><div class="category-panel" id="category-panel" hidden><a class="${route === 'products' && !category ? 'active' : ''}" href="#products" data-category="">${esc(navigation().allLabel)}${icon('arrow')}</a>${config.categories.map(name => `<a class="${route === 'products' && category === name ? 'active' : ''}" href="#products" data-category="${esc(name)}">${esc(name)}${icon('chevron')}</a>`).join('')}</div></div><nav class="nav nav-tabs" aria-label="Điều hướng chính">${navigation().items.filter(item => item.enabled).map(item => `<a class="${'#' + route === navigationHref(item) ? 'active' : ''} ${item.id === 'rewards' ? 'rewards-link' : ''}" href="${navigationHref(item)}" ${'#' + route === navigationHref(item) ? 'aria-current="page"' : ''}>${item.id === 'rewards' ? esc(item.label).replace(/Rewards$/i, word => `<span class="rewards-word">${word}</span>`) : esc(item.label)}</a>`).join('')}${isStaff() ? `<a class="admin-link" href="#admin">${label('admin')}</a>` : ''}</nav></div></div></header>`;
+    </div><div class="nav-shell"><div class="wrap nav-frame"><div class="category-menu"><button class="category-toggle ${route === 'products' ? 'active' : ''}" id="category-toggle" aria-expanded="false" aria-controls="category-panel">${icon('menu')}<span>${esc(navigation().categoryLabel)}</span>${icon('down')}</button><div class="category-panel" id="category-panel" hidden><a class="${route === 'products' && !category ? 'active' : ''}" href="#products" data-category="">${esc(navigation().allLabel)}${icon('arrow')}</a>${config.categories.map(name => `<a class="${route === 'products' && category === name ? 'active' : ''}" href="#products" data-category="${esc(name)}">${esc(name)}${icon('chevron')}</a>`).join('')}</div></div><nav class="nav nav-tabs" aria-label="Điều hướng chính">${navigation().items.filter(item => item.enabled).map(item => `<a class="${'#' + route === navigationHref(item) ? 'active' : ''} ${item.id === 'rewards' ? 'rewards-link' : ''}" href="${navigationHref(item)}" ${'#' + route === navigationHref(item) ? 'aria-current="page"' : ''}>${item.id === 'rewards' ? esc(item.label).replace(/Rewards$/i, word => `<span class="rewards-word">${word}</span>`) : esc(item.label)}</a>`).join('')}${isStaff() ? `<a class="admin-link" href="#admin">${label('admin')}</a>` : ''}</nav></div></div></header></div>`;
 }
 function footer() {
   const content = editorial();
@@ -202,8 +236,13 @@ function editProduct(product = { name: '', category: config.categories[0] || '',
     <section class="product-editor-section"><h3>Ảnh sản phẩm</h3><img class="admin-image-preview" id="product-image-preview" src="${esc(product.image)}" alt="Ảnh chính" ${product.image ? '' : 'hidden'}><label>Tải ảnh chính lên<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="image"><small>PNG, JPG hoặc WebP, tối đa 5 MB. Nhấn Lưu sản phẩm sau khi tải.</small></label><label>Hoặc dùng đường dẫn ảnh<input name="image" value="${esc(product.image)}" placeholder="/uploads/anh.webp hoặc https://..."></label><details class="admin-section"><summary>Thêm ảnh trong thư viện</summary>${editorInput('detail_gallery', 'Mỗi dòng một đường dẫn ảnh', (info.gallery || []).join('\n'), true)}</details></section>
     <section class="product-editor-section"><h3>Nội dung giới thiệu</h3>${editorInput('detail_summary', 'Giới thiệu ngắn (trên thẻ sản phẩm)', info.summary, true)}<label>Mô tả chi tiết<textarea name="description" maxlength="10000">${esc(product.description)}</textarea></label></section>
     <details class="admin-section"><summary>Thông số & đặc điểm sản phẩm</summary><div class="settings-grid">${[['material', 'Chất liệu'], ['dimensions', 'Kích thước'], ['capacity', 'Dung tích'], ['color', 'Màu sắc']].map(([key, title]) => editorInput('detail_' + key, title, info[key])).join('')}</div>${editorInput('detail_badge', 'Nhãn nổi bật trên thẻ sản phẩm', info.badge)}${editorInput('detail_features', 'Đặc điểm nổi bật (mỗi dòng một mục)', (info.features || []).join('\n'), true)}${editorInput('detail_specifications', 'Thông số khác (mỗi dòng: tên thông số: giá trị)', (info.specifications || []).map(spec => spec.label + ': ' + spec.value).join('\n'), true)}${editorInput('detail_care', 'Hướng dẫn sử dụng & bảo quản', info.care, true)}</details>
-    <div class="error" role="alert"></div><button class="primary">Lưu sản phẩm ${icon('check')}</button></form>`);
-  bindUploads($('#product-form'));
+    <div class="error" role="alert"></div><button type="submit" class="primary">Lưu sản phẩm ${icon('check')}</button></form>`);
+  const productForm = $('#product-form');
+  productForm.elements.name.focus({ preventScroll: true });
+  productForm.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229 && event.target.matches('input')) event.preventDefault();
+  });
+  bindUploads(productForm);
   const imageInput = $('#product-form [name="image"]');
   const preview = () => { const img = $('#product-image-preview'); img.hidden = !imageInput.value; img.src = imageInput.value; };
   imageInput.addEventListener('input', preview);
@@ -260,10 +299,22 @@ async function loadProducts(){const first=(await api('/catalog?limit=16')).items
 async function refresh() { [config, products, commerce, me] = await Promise.all([api('/settings'), loadProducts(), api('/commerce'), api('/me')]); await render(); }
 function commerceContext() { return { api, esc, money, me, config, commerce, products, cart, saveCart, toast, submit, render, refresh, productCard, orderCard, reloadUser }; }
 let generation = 0, lastRenderedRoute, catalogPageNumber=1;
-async function render() {
+async function render({ settings } = {}) {
   const current = ++generation;
   try {
     const route = location.hash.slice(1) || (location.pathname.startsWith('/san-pham/') ? 'product/'+Number(location.pathname.split('/')[2].split('-')[0]) : '');
+    if (isStorefront(route)) {
+      const next = settings || await readStoreSettings();
+      if (current !== generation) return;
+      const changed = JSON.stringify(next) !== JSON.stringify(config);
+      let nextProducts = products;
+      if (changed) {
+        nextProducts = await loadProducts();
+        if (current !== generation) return;
+      }
+      config = next; products = nextProducts;
+      if (category && !config.categories.includes(category)) { category = ''; catalogPageNumber = 1; }
+    }
     if(route.startsWith('product/')) { try { const item=await api('/products/'+Number(route.split('/')[1]));products=products.filter(p=>p.id!==item.id).concat(item); } catch {} }
     const extra = route.startsWith('manage') ? await adminUI.page(({commerce:'commerce',inventory:'inventory'}[route.split('/')[1]] || route.split('/')[1] || 'overview').split('?')[0]) : await extraPage(route, commerceContext());
     const body = extra ?? (route === 'cart' ? cartPage() : route === 'account' ? await accountPage() : (route === 'admin' || route.startsWith('admin/')) ? await adminUI.page(route.split('/')[1] || '') : route === 'products' ? await catalog() : route.startsWith('collection/') || route.startsWith('page/') ? await navigationPage(route.split('/')[1]) : route.startsWith('product/') ? productPage(Number(route.split('/')[1])) : route === 'inspiration' ? `<main class="wrap page">${journalSection()}</main>` : home());
@@ -276,6 +327,7 @@ async function render() {
     for (const [key, value] of Object.entries(config.colors)) document.documentElement.style.setProperty('--' + key, value);
     const adminRoute = route === 'admin' || route.startsWith('admin/') || route.startsWith('manage');
     $('#app').innerHTML = adminRoute ? body : header() + body + footer();
+    watchHeader();
     if (!adminRoute) applyCopy($('#app'));
     document.querySelectorAll('a[href^="#product/"]').forEach(a=>{const p=products.find(p=>p.id===Number(a.getAttribute('href').split('/')[1]));if(p?.url)a.href=p.url;});
     updateLanguageContext({...commerceContext(),route});
@@ -398,6 +450,10 @@ function changePassword() {
 const adminUI = createAdminUI({ api, esc, money, icon, modal, submit, statusNames, editProduct, orderCard, orderManage: o => orderManage(o, commerceContext()), commercePage: section => extraPage('manage/' + section, { ...commerceContext(), adminEmbedded: true }), enhanceModal: () => enhanceCommerce({ ...commerceContext(), refresh: async () => { await motion.closeDialog($('#modal')); await refresh(); } }), getUser: () => me.user, getConfig: () => config, getCsrf: () => me.csrf, products: () => products, refresh, render, reloadUser, logout: logoutSession, changePassword, toast, closeModal: () => motion.closeDialog($('#modal')) });
 window.addEventListener('beforeunload', event => { if (adminUI.isDirty()) { event.preventDefault(); event.returnValue = ''; } });
 motion.installDialog($('#modal'));
+window.addEventListener('focus', syncStorefront);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) void syncStorefront(); });
+window.addEventListener('storage', event => { if (event.key === storeUpdateKey) void syncStorefront(); });
+setInterval(syncStorefront, 15000);
 window.addEventListener('popstate',()=>render());
 document.addEventListener('click',event=>{const a=event.target.closest('a');if(!a||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||a.target)return;const u=new URL(a.href,location.href);if(u.origin===location.origin&&u.pathname.startsWith('/san-pham/')){event.preventDefault();history.pushState({},'',u.pathname+u.search);render();window.scrollTo(0,0);}});
 document.addEventListener('click', event => { if (!event.target.closest('.category-menu')) closeCategories(); });

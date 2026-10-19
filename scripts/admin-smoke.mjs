@@ -49,12 +49,27 @@ try {
   const itemId=db.prepare('SELECT id FROM products WHERE name=?').get('Sản phẩm quản trị').id;
   await p.locator('[data-product-edit="'+itemId+'"]').click();
   assert.equal(await p.locator('#product-form [name=stock]').count(),0);
+  assert.equal(await p.locator('#product-form [name=name]').evaluate(input=>input===document.activeElement),true,'editor should focus its name field rather than the close button');
+  const productBeforeEnter=db.prepare('SELECT * FROM products WHERE id=?').get(itemId);
+  const auditBeforeEnter=db.prepare('SELECT COUNT(*) n FROM audit_log').get().n;
+  await p.locator('#product-form [name=name]').fill('Chưa lưu bằng Enter');
+  await p.locator('#product-form [name=name]').press('Enter');await p.waitForTimeout(150);
+  assert.equal(await p.locator('#modal').evaluate(dialog=>dialog.open),true);
+  assert.deepEqual(db.prepare('SELECT * FROM products WHERE id=?').get(itemId),productBeforeEnter);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM audit_log').get().n,auditBeforeEnter);
+  await p.locator('#product-form [name=name]').fill(productBeforeEnter.name);
+  await p.locator('#product-form [name=description]').fill('Dòng đầu');
+  await p.locator('#product-form [name=description]').press('End');await p.locator('#product-form [name=description]').press('Enter');
+  await p.locator('#product-form [name=description]').pressSequentially('Dòng tiếp theo');
+  assert.equal(await p.locator('#product-form [name=description]').inputValue(),'Dòng đầu\nDòng tiếp theo');
+  assert.equal(await p.locator('#modal').evaluate(dialog=>dialog.open),true);
+
   const order = await request(p,'/orders','POST',{country:'VN',province_code:'01',ward_code:'00004',recipient:'Concurrent buyer',phone:'0901234567',address:'123 QA street',payment:'cod',items:[{id:itemId,quantity:1}]});
   assert.equal(order.status,201);
   await p.locator('#product-form [name=description]').fill('Description saved after stock changed');
   await p.locator('#product-form [name=price]').fill('136000');
   const productSave=p.waitForResponse(r=>r.url().endsWith('/api/admin/products/'+itemId)&&r.request().method()==='PATCH');
-  await p.locator('#product-form button.primary').click(); assert.equal((await productSave).status(),200);
+  await p.locator('#product-form button.primary').focus(); await p.locator('#product-form button.primary').press('Enter'); assert.equal((await productSave).status(),200);
   await p.locator('#product-form').waitFor({state:'hidden'});
   assert.equal(db.prepare('SELECT stock FROM products WHERE id=?').get(itemId).stock,31);
   assert.equal(db.prepare('SELECT SUM(delta) delta FROM inventory_movements WHERE product_id=? AND order_id IS NOT NULL').get(itemId).delta,-1);
@@ -117,5 +132,5 @@ try {
   const customer=await login('customer'); await customer.goto(base+'/#admin'); await customer.getByText('Tài khoản này không có quyền quản trị.').waitFor();
   // Account password UI and logout of current session.
   await editor.locator('[data-own-password]').click(); await editor.locator('#change-password [name=currentPassword]').fill(password); const changed=randomBytes(20).toString('hex'); await editor.locator('#change-password [name=newPassword]').fill(changed); await editor.locator('#change-password [name=confirmPassword]').fill(changed); await editor.locator('#change-password button.primary').click(); await editor.locator('#auth').waitFor();
-  assert.deepEqual(errors,[]); console.log('Browser passed: admin CRUD, upload, stock-safe content edits and visibility, visible price audit changes, review audit rollback, stale configuration conflict, categories, order transitions, section content saves, user roles/status/reset, self safeguards, unsaved prompt, role menus, password change and responsive widths 375/768/1440.');
+  assert.deepEqual(errors,[]); console.log('Browser passed: admin CRUD, upload, Enter-safe editor, stock-safe content edits and visibility, visible price audit changes, review audit rollback, stale configuration conflict, categories, order transitions, section content saves, user roles/status/reset, self safeguards, unsaved prompt, role menus, password change and responsive widths 375/768/1440.');
 } finally { await browser.close(); await new Promise(r=>server.close(r)); db.close(); rmSync(dir,{recursive:true,force:true}); }

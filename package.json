@@ -20,7 +20,8 @@
     "test:browser": "node scripts/browser-smoke.cjs",
     "test:languages": "node scripts/language-smoke.cjs",
     "addresses:update": "node --use-env-proxy scripts/update-vietnam-addresses.js",
-    "test:admin": "node scripts/admin-smoke.mjs"
+    "test:admin": "node scripts/admin-smoke.mjs",
+    "test:storefront": "node scripts/storefront-smoke.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

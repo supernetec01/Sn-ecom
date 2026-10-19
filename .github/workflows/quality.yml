@@ -26,6 +26,9 @@ jobs:
           - label: Chromium admin smoke
             command: test:admin
             browser: true
+          - label: Chromium storefront sync
+            command: test:storefront
+            browser: true
           - label: Chromium language smoke
             command: test:languages
             browser: true
