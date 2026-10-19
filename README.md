@@ -1,5 +1,7 @@
 # Super Net — storefront & administration
 
+Website có bộ chọn **Tiếng Việt / English / 繁體中文**. Nhãn giao diện dùng bản dịch đi kèm; nội dung công khai có thể dịch bằng Google Cloud Translation qua backend với cache và hạn mức. Xem [cấu hình ngôn ngữ và PowerShell](docs/languages.md).
+
 Ứng dụng thương mại điện tử bằng Node.js 24, Express và SQLite. Đây là bản phát triển chạy được, **chưa phải bản đã kiểm toán hoặc sẵn sàng mở bán công khai**.
 
 ## Chạy ứng dụng
@@ -42,13 +44,15 @@ Các tác vụ đã ở môi trường tách biệt: dùng checkout hiện có, 
 
 ## Nội dung quản trị
 
+Trang quản trị mới dùng thanh bên theo nhóm công việc, bảng tìm kiếm/lọc và biểu mẫu từng mục; quản lý tài khoản, khóa tài khoản và sáu vai trò. Xem [hướng dẫn sử dụng và phân quyền](docs/admin-guide.md). `npm run test:admin` kiểm tra trực tiếp giao diện với DB tạm.
+
 - Sản phẩm: thêm/sửa/xóa/ẩn, giá, tồn kho, danh mục, mô tả, ảnh chính hoặc tải PNG/JPEG/WebP lên (5 MB). Thông tin chi tiết gồm SKU, mô tả ngắn, vật liệu, kích thước, dung tích, màu, điểm nổi bật, bảng thông số, cách bảo quản, thư viện ảnh, nhãn và trạng thái sản phẩm mẫu.
 - Nội dung & cài đặt: logo, ảnh banner, màu sắc, tiêu đề, mô tả, nút, danh mục, cam kết, thông tin liên hệ, chính sách, nhãn và nội dung giao diện. Mục nội dung mở rộng `editorial` quản lý ảnh danh mục, bộ sưu tập, câu chuyện thương hiệu, bài viết cảm hứng và nội dung chân trang. Các dữ liệu JSON được kiểm tra trên máy chủ; văn bản không thực thi HTML.
 - Giao hàng mặc định 30.000đ; miễn phí từ 500.000đ. Phí cố định toàn quốc là giả định để phát triển, chưa tích hợp báo giá hãng vận chuyển.
 - Chuyển khoản: cấu hình ngân hàng, số tài khoản, chủ tài khoản. Chưa đủ ba mục thì checkout chỉ nhận COD. Thông tin ngân hàng được chụp vào đơn khi đặt; sửa ngân hàng không thay đổi đơn cũ. Chuyển khoản phải đối soát thủ công, không tự đánh dấu đã thanh toán.
 - Đơn hàng: chờ xác nhận → xác nhận → đang giao → hoàn tất. Chỉ hủy trước khi giao; hoàn tồn kho một lần.
 
-Thanh điều hướng gồm **Danh mục**, **Bán chạy**, **Sản phẩm mới**, **Khuyến mãi**, **Sự kiện**, **Cửa hàng**, **Nhượng quyền** và **Super Net Rewards**. Trong **Quản trị → Nội dung & cài đặt**, mục thanh điều hướng cho phép sửa tên, bật/tắt các tab, ảnh và nội dung trang, cùng danh sách sản phẩm giới thiệu. Menu Danh mục lấy các nhóm sản phẩm từ danh mục đã cấu hình. Nếu không chọn sản phẩm riêng, Bán chạy dựa trên số lượng trong đơn hàng **hoàn tất** và Sản phẩm mới hiển thị sản phẩm theo thứ tự thêm gần đây; các trang khác chỉ giới thiệu sản phẩm đã chọn. Chưa có đơn hoàn tất thì Bán chạy không tự tạo số liệu hoặc lượt mua mẫu. Khuyến mãi, sự kiện, nhượng quyền và Rewards hiện là các trang nội dung có thể chỉnh sửa; không tự giảm giá, tích điểm hay kích hoạt chương trình thành viên. Khi cập nhật, cấu hình điều hướng mặc định chỉ được thêm nếu chưa tồn tại; các nhãn và nội dung đã lưu được giữ nguyên.
+Thanh điều hướng gồm **Danh mục**, **Bán chạy**, **Sản phẩm mới**, **Khuyến mãi**, **Sự kiện**, **Cửa hàng**, **Nhượng quyền** và **Super Net Rewards**. Trong **Quản trị → Nội dung website → Menu & các trang**, mục thanh điều hướng cho phép sửa tên, bật/tắt các tab, ảnh và nội dung trang, cùng danh sách sản phẩm giới thiệu. Menu Danh mục lấy các nhóm sản phẩm từ danh mục đã cấu hình. Nếu không chọn sản phẩm riêng, Bán chạy dựa trên số lượng trong đơn hàng **hoàn tất** và Sản phẩm mới hiển thị sản phẩm theo thứ tự thêm gần đây; các trang khác chỉ giới thiệu sản phẩm đã chọn. Chưa có đơn hoàn tất thì Bán chạy không tự tạo số liệu hoặc lượt mua mẫu. Khuyến mãi, sự kiện, nhượng quyền và Rewards hiện là các trang nội dung có thể chỉnh sửa; không tự giảm giá, tích điểm hay kích hoạt chương trình thành viên. Khi cập nhật, cấu hình điều hướng mặc định chỉ được thêm nếu chưa tồn tại; các nhãn và nội dung đã lưu được giữ nguyên.
 
 Bộ 16 sản phẩm, thông số kỹ thuật, giá, tồn kho, bài viết và chính sách ban đầu là **dữ liệu mẫu**, không phải hàng hóa hoặc cam kết thương mại đã xác minh. Ảnh dùng để minh họa phong cách; có thể không trùng chính xác với tên và thông số mẫu. Cần thay bằng thông tin và ảnh sản phẩm thực trước khi mở bán; đổi trạng thái mẫu trong admin khi đã kiểm tra dữ liệu. Không có đánh giá, lượt mua hoặc chứng nhận giả được tạo. Logo được trích xuất từ PDF do người dùng cung cấp. Giao diện là thiết kế riêng dựa trên yêu cầu.
 
@@ -76,9 +80,27 @@ DevTools/Network không thể bị cấm đáng tin cậy. Việc sửa request 
 ## Còn cần trước khi mở bán
 
 - Tích hợp MoMo/ZaloPay qua tài khoản merchant, sandbox, kiểm tra chữ ký callback, số tiền, mã đơn và tính idempotent. Hiện hai phương thức này **chưa hoạt động**, API từ chối chúng.
-- Xác minh email, quên/đổi mật khẩu, MFA cho admin, nhật ký kiểm toán quản trị, quy trình hoàn tiền và vận chuyển thực tế.
+- Cấu hình và vận hành email xác minh/khôi phục, khuyến khích MFA cho admin; kiểm tra quy trình đối soát, hoàn tiền và hãng vận chuyển thực tế. Các luồng phần mềm đã có, cần dịch vụ và quy trình vận hành tương ứng.
 - Tên miền/HTTPS, sao lưu/khôi phục, giám sát, email giao dịch và đánh giá bảo mật độc lập; cập nhật thông tin công ty, dữ liệu thật và chính sách hợp lệ.
-- Ảnh tải lên hiện kiểm tra định dạng chữ ký tệp và dung lượng; trước khi mở công khai nên thêm giải mã/tái mã hóa ảnh, giới hạn số điểm ảnh và dọn tệp không dùng.
+- Ảnh tải lên đã giải mã/tái mã hóa WebP và giới hạn dung lượng/số điểm ảnh; cần tác vụ dọn tệp không dùng khi vận hành.
 - Phân trang/tìm kiếm máy chủ và DB phục vụ nhiều instance khi quy mô tăng. Bản hiện tại phục vụ một instance Node với SQLite.
 
 Không lưu khóa thanh toán hoặc mật khẩu vào nội dung admin, mã nguồn hoặc chat. Trang cấu hình ngân hàng chỉ chứa thông tin nhận chuyển khoản công khai.
+
+## Chống gửi lặp checkout
+
+Giao diện tạo `Idempotency-Key` cho từng nội dung đặt hàng và giữ mã trong sessionStorage khi yêu cầu lỗi để lần thử lại nhận cùng đơn. Máy chủ lưu kết quả trong SQLite cùng transaction trừ tồn kho: cùng tài khoản, mã và nội dung trả lại đơn cũ (HTTP 200); dùng lại mã cho nội dung khác trả HTTP 409. Lần mua mới dùng mã mới. Mọi client API phải gửi header này; request thiếu hoặc sai định dạng mã bị từ chối HTTP 400 cho cả khách vãng lai và tài khoản.
+
+Số điện thoại được bỏ khoảng trắng, dấu ngoặc và dấu gạch ngang, sau đó yêu cầu 9–15 chữ số, có thể có dấu `+` đầu. Đây là kiểm tra định dạng, chưa xác minh chủ sở hữu số điện thoại.
+
+## Bản nâng cấp bán hàng
+
+Đã hợp nhất quản trị bán hàng và nội dung tại `#admin` (giữ tương thích đường dẫn `#manage`), thanh toán/đối soát, vận đơn, đổi trả, lịch sử kho, biến thể, mã giảm giá, Rewards tùy chọn, mua không cần tài khoản, hồ sơ/MFA, đánh giá người mua, CSV, SEO và trợ lý sản phẩm. Xem [hướng dẫn vận hành và cấu hình dịch vụ ngoài](docs/commerce-upgrade.md) để biết tính năng hiện có, quy tắc và phần chưa kết nối.
+
+`npm run test:browser` chạy luồng người dùng bằng Playwright trên DB tạm. `npm run backup -- <thư-mục>` sao lưu SQLite/uploads. Email dùng hàng đợi và cần worker; AI/VNPay chỉ hoạt động sau khi cấu hình khóa/tài khoản phù hợp. Các ghi chú “chưa có” ở phần bản 0.2 phía trên mô tả trước nâng cấp; tài liệu mới là nguồn chi tiết cho bản hiện tại.
+
+Địa chỉ giao hàng chỉ tại Việt Nam, chọn Tỉnh/thành phố → Phường/xã/đặc khu theo bộ dữ liệu mới lưu trong ứng dụng. Xem [nguồn dữ liệu và cách cập nhật](docs/vietnam-addresses.md). Địa chỉ cũ không bị ghi đè; cần chọn lại tỉnh/xã khi dùng cho đơn mới.
+
+## Kiểm thử tự động và sửa lỗi QA
+
+GitHub Actions chạy API/regression, Chromium mua hàng, đa ngôn ngữ và schema/concurrency PostgreSQL trên mỗi push/PR. Xem [bản sửa bốn lỗi QA và hợp đồng checkout](docs/qa-fixes-2026-10-19.md).

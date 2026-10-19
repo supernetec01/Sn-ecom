@@ -1,0 +1,229 @@
+﻿Mã,Nhóm,Chức năng,Trạng thái mã nguồn,Bằng chứng,Giới hạn / phần còn thiếu
+UC-001,A,Đăng ký tài khoản,Có,server.js,Đăng ký email và mật khẩu hash scrypt.
+UC-002,A,"Đăng nhập bằng email, số điện thoại",Một phần,server.js,Đăng nhập email; chưa đăng nhập bằng số điện thoại.
+UC-003,A,"Đăng nhập Google, Facebook, Apple",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa đăng nhập mạng xã hội.
+UC-004,A,Đăng xuất,Có,server.js,Xóa session máy chủ và cookie.
+UC-005,A,Quên và đặt lại mật khẩu,Một phần,commerce-api.js,Token một lần có hạn; email chưa có dịch vụ gửi.
+UC-006,A,Xác thực OTP/email,Một phần,commerce-api.js,Xác minh email bằng token; chưa OTP điện thoại; chưa gửi email thật.
+UC-007,A,"Xem, chỉnh sửa thông tin cá nhân",Một phần,commerce-api.js,Sửa họ tên; email không có luồng thay đổi.
+UC-008,A,Đổi mật khẩu,Có,commerce-api.js,Kiểm tra mật khẩu hiện tại/MFA và thu hồi phiên khác.
+UC-009,A,Quản lý nhiều địa chỉ giao hàng,Có,commerce-api.js,Thêm/xóa tối đa 20 địa chỉ; xác thực tỉnh và xã Việt Nam.
+UC-010,A,"Quản lý thiết bị, phiên đăng nhập",Một phần,commerce-api.js,Liệt kê/thu hồi phiên; chưa thông tin thiết bị hay lịch sử IP.
+UC-011,A,Xóa hoặc vô hiệu hóa tài khoản,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa luồng khóa/xóa tài khoản.
+UC-012,A,Quản lý đồng ý nhận quảng cáo và quyền riêng tư,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa nhật ký đồng ý và quyền riêng tư.
+UC-013,B,Xem trang chủ,Có,public/app.js,Trang chủ lấy nội dung và sản phẩm từ API.
+UC-014,B,"Xem banner, slider quảng cáo",Một phần,public/app.js,Banner/hero chỉnh được; chưa bộ slider quảng cáo.
+UC-015,B,"Xem danh mục, danh mục con",Một phần,store.js,Danh mục phẳng trong settings JSON; chưa danh mục con.
+UC-016,B,Xem danh sách sản phẩm,Có,commerce-api.js,Danh sách phân trang máy chủ.
+UC-017,B,Xem chi tiết sản phẩm,Có,server.js,API chi tiết và giao diện sản phẩm.
+UC-018,B,"Tìm kiếm theo tên, mã SKU, từ khóa",Một phần,commerce-api.js,Tìm không dấu trong tên/mô tả/details; chưa tìm SKU biến thể riêng.
+UC-019,B,"Gợi ý từ khóa, tự động hoàn thành",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa gợi ý từ khóa.
+UC-020,B,"Lọc theo giá, thương hiệu, thuộc tính, tình trạng hàng",Một phần,commerce-api.js,Lọc danh mục/khoảng giá; chưa thương hiệu/thuộc tính/còn hàng.
+UC-021,B,"Sắp xếp theo giá, mới nhất, bán chạy, đánh giá",Một phần,commerce-api.js,Giá/tên/mới nhất; bán chạy là collection riêng; chưa sắp xếp theo đánh giá.
+UC-022,B,"Xem hình ảnh, video sản phẩm",Một phần,public/app.js,Ảnh và gallery; chưa video sản phẩm.
+UC-023,B,"Xem biến thể màu sắc, kích thước, dung lượng",Có,public/commerce-ui.js,"Chọn biến thể, giá và tồn riêng."
+UC-024,B,"Xem giá, khuyến mãi, số lượng khả dụng",Một phần,commerce-store.js,Hiện giá và tồn; chưa giá khuyến mãi theo lịch ở SKU.
+UC-025,B,So sánh sản phẩm,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa so sánh sản phẩm.
+UC-026,B,"Xem sản phẩm liên quan, sản phẩm đề xuất",Có,public/app.js,Gợi ý cùng danh mục; chưa cá nhân hóa.
+UC-027,B,Xem sản phẩm đã xem gần đây,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa lưu sản phẩm vừa xem.
+UC-028,B,"Xem đánh giá, hỏi đáp sản phẩm",Một phần,commerce-api.js,Đánh giá đã duyệt; chưa hỏi đáp sản phẩm.
+UC-029,C,Thêm/xóa sản phẩm yêu thích,Có,commerce-api.js,Lưu/xóa yêu thích theo tài khoản trong DB.
+UC-030,C,Xem danh sách yêu thích,Có,commerce-api.js,Danh sách yêu thích từ DB.
+UC-031,C,Thêm sản phẩm vào giỏ hàng,Có,public/app.js,Giỏ lưu ID/số lượng/biến thể; giá do API tính lại.
+UC-032,C,Mua ngay,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa nút/luồng mua ngay riêng.
+UC-033,C,Cập nhật số lượng sản phẩm,Có,public/commerce-ui.js,Cập nhật số lượng trong giỏ.
+UC-034,C,Xóa sản phẩm khỏi giỏ hàng,Có,public/commerce-ui.js,Xóa dòng giỏ theo chỉ số.
+UC-035,C,Chọn biến thể sản phẩm,Có,public/commerce-ui.js,Bắt buộc chọn biến thể khi sản phẩm có biến thể.
+UC-036,C,Kiểm tra tồn kho khi thêm vào giỏ,Có,public/app.js,Kiểm tra lượng thêm với tồn đang tải; API kiểm tra lại khi đặt.
+UC-037,C,"Tự động tính tạm tính, giảm giá",Có,commerce-api.js,"Quote máy chủ tính lại giá, mã, điểm và phí giao."
+UC-038,C,Áp dụng hoặc gỡ mã giảm giá,Có,public/commerce-ui.js,Nhập hoặc bỏ mã và tính lại quote.
+UC-039,C,Ước tính phí vận chuyển,Có,commerce-api.js,Phí theo vùng và ngưỡng miễn phí; không gọi hãng vận chuyển.
+UC-040,C,Lưu giỏ hàng cho lần truy cập sau,Một phần,public/app.js,localStorage trên cùng trình duyệt; chưa giỏ máy chủ.
+UC-041,C,Đồng bộ giỏ hàng khi đăng nhập,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa giỏ máy chủ hoặc hợp nhất giỏ khi đăng nhập.
+UC-042,C,Cảnh báo sản phẩm hết hàng hoặc thay đổi giá,Một phần,public/commerce-ui.js,Chặn vượt tồn/ngừng bán; chưa thông báo riêng thay đổi giá cũ/mới.
+UC-043,D,Đặt hàng không cần tài khoản,Có,commerce-api.js,Guest đặt hàng với email và idempotency key; token tra cứu riêng.
+UC-044,D,Đặt hàng bằng tài khoản,Có,commerce-api.js,Đặt hàng theo session và CSRF.
+UC-045,D,Nhập thông tin người nhận,Có,commerce-api.js,"Xác thực tên, số điện thoại và địa chỉ phía máy chủ."
+UC-046,D,Chọn hoặc thêm địa chỉ giao hàng,Có,commerce-api.js,Chọn địa chỉ lưu hoặc nhập mới; thêm địa chỉ ở hồ sơ.
+UC-047,D,Chọn phương thức vận chuyển,Một phần,public/commerce-ui.js,Chỉ giao tiêu chuẩn theo quy tắc; chưa chọn hãng/gói giao.
+UC-048,D,Chọn phương thức thanh toán,Có,commerce-api.js,COD; bank/VNPay chỉ khi cấu hình.
+UC-049,D,Thanh toán COD,Có,commerce-api.js,Đơn COD ban đầu chưa thu tiền.
+UC-050,D,Thanh toán chuyển khoản ngân hàng,Một phần,commerce-api.js,Snapshot ngân hàng và đối soát thủ công; cấu hình hiện còn trống.
+UC-051,D,Thanh toán qua mã QR/VietQR,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa tạo VietQR/QR chuyển khoản.
+UC-052,D,Thanh toán qua ví điện tử/cổng thanh toán,Một phần,payments.js,Adapter VNPay có mã và test chữ ký local; chưa merchant/sandbox thật; chưa MoMo/ZaloPay.
+UC-053,D,Thanh toán qua thẻ ngân hàng,Một phần,payments.js,Dẫn sang cổng VNPay; chưa kiểm chứng thanh toán thẻ thật.
+UC-054,D,"Sử dụng voucher, điểm thưởng",Có,commerce-api.js,Voucher và ledger điểm; Rewards mặc định tắt.
+UC-055,D,Xác nhận đơn hàng,Có,commerce-api.js,Tạo đơn/trừ tồn/lịch sử/outbox cùng transaction.
+UC-056,D,Xử lý thanh toán thành công/thất bại/chờ xác nhận,Một phần,payments.js,IPN xác minh chữ ký/số tiền; không tin browser return; chưa gateway thật.
+UC-057,D,Thử thanh toán lại,Một phần,payments.js,Tái dùng intent chưa hết hạn/tạo link mới; chưa kiểm chứng retry với merchant.
+UC-058,D,Gửi email/SMS xác nhận đơn hàng,Một phần,commerce-store.js,Có email outbox; thiếu cấu hình và worker gửi thật; chưa SMS.
+UC-059,D,Tạo yêu cầu xuất hóa đơn,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa yêu cầu xuất hóa đơn.
+UC-060,D,Phát hiện và ngăn tạo đơn trùng khi thanh toán lại,Một phần,commerce-api.js,Frontend gửi key; API vẫn cho tài khoản bỏ key và tạo đơn lặp.
+UC-061,E,Xem danh sách đơn hàng,Có,commerce-api.js,Đơn theo tài khoản đang đăng nhập.
+UC-062,E,Xem chi tiết đơn hàng,Có,commerce-api.js,Chi tiết chỉ chủ đơn hoặc guest token.
+UC-063,E,"Tra cứu đơn theo mã, số điện thoại và xác thực phù hợp",Có,commerce-api.js,Tra bằng mã đơn và token riêng; không dùng số điện thoại làm mật khẩu.
+UC-064,E,Theo dõi trạng thái xử lý,Có,commerce-store.js,Trạng thái và lịch sử đơn lưu DB.
+UC-065,E,Theo dõi vận đơn,Một phần,commerce-api.js,Mã/link vận đơn nhập tay; chưa đồng bộ hãng.
+UC-066,E,Yêu cầu hủy đơn,Có,commerce-api.js,Chỉ hủy đơn đủ điều kiện; hoàn tồn một lần.
+UC-067,E,"Yêu cầu thay đổi địa chỉ, thông tin nhận",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa yêu cầu đổi địa chỉ trên đơn.
+UC-068,E,Xác nhận đã nhận hàng,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa khách tự xác nhận nhận hàng.
+UC-069,E,"Tải hóa đơn, chứng từ được cung cấp",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa tải chứng từ/hóa đơn.
+UC-070,E,Mua lại sản phẩm từ đơn cũ,Có,public/commerce-ui.js,Mua lại dùng giá/tồn hiện tại.
+UC-071,E,Gửi yêu cầu trả hàng/hoàn tiền,Một phần,commerce-api.js,Yêu cầu trả toàn đơn; ledger hoàn tiền thủ công; chưa trả từng dòng.
+UC-072,E,"Theo dõi tiến trình khiếu nại, hoàn tiền",Một phần,public/commerce-ui.js,Hiện tiến trình return/thu hoàn; chưa hồ sơ khiếu nại chung.
+UC-073,F,Đánh giá sao sản phẩm,Có,commerce-api.js,1–5 sao từ tài khoản đã nhận hàng; chờ duyệt.
+UC-074,F,"Viết nhận xét, tải ảnh/video",Một phần,commerce-api.js,Nhận xét văn bản; chưa ảnh/video.
+UC-075,F,Chỉnh sửa/xóa đánh giá của mình,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa API sửa/xóa review của người viết.
+UC-076,F,Hỏi đáp về sản phẩm,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa hỏi đáp sản phẩm.
+UC-077,F,Chat trực tuyến với cửa hàng,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa live chat nhân viên.
+UC-078,F,Chatbot hỗ trợ tự động,Một phần,commerce-api.js,Tra cứu danh mục hoạt động; adapter AI chưa có khóa/model.
+UC-079,F,Tạo phiếu hỗ trợ (ticket),Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa ticket hỗ trợ.
+UC-080,F,Yêu cầu bảo hành,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa hồ sơ bảo hành.
+UC-081,F,Yêu cầu đổi/trả,Một phần,commerce-api.js,Trả toàn đơn; chưa quy trình đổi hàng thay thế.
+UC-082,F,"Đính kèm hình ảnh, video khiếu nại",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa upload chứng cứ khiếu nại.
+UC-083,F,Theo dõi trạng thái hỗ trợ,Một phần,public/commerce-ui.js,Theo dõi return; chưa ticket/CSKH tổng quát.
+UC-084,F,Gửi đánh giá mức độ hài lòng,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa khảo sát hài lòng.
+UC-085,G,"Thêm, sửa, ẩn, xóa hoặc lưu trữ sản phẩm",Có,server.js,CRUD/ẩn sản phẩm; xóa mềm để giữ lịch sử.
+UC-086,G,"Quản lý danh mục, thương hiệu",Một phần,server.js,Sửa danh mục phẳng; chưa thương hiệu hoặc cây danh mục.
+UC-087,G,"Quản lý SKU, mã vạch",Một phần,server.js,"SKU cha trong JSON, biến thể UNIQUE; chưa mã vạch và UNIQUE chung trong DB."
+UC-088,G,Quản lý thuộc tính và biến thể,Có,commerce-api.js,Biến thể có SKU/label/giá/tồn; thuộc tính còn dạng nhãn.
+UC-089,G,"Quản lý giá bán, giá vốn, giá khuyến mãi",Một phần,server.js,Giá bán; chưa giá vốn/lịch khuyến mãi.
+UC-090,G,"Quản lý hình ảnh, video",Một phần,server.js,Ảnh giải mã và WebP; chưa upload video.
+UC-091,G,"Quản lý thông số, mô tả, hướng dẫn sử dụng",Có,server.js,"Details có thông số, mô tả, hướng dẫn và gallery."
+UC-092,G,Quản lý tồn kho theo SKU,Có,commerce-api.js,Tồn theo SKU/biến thể; kiểm tra không âm.
+UC-093,G,"Quản lý trạng thái hiển thị, hết hàng",Có,server.js,Ẩn sản phẩm; hiện trạng thái theo tồn.
+UC-094,G,Nhập/xuất danh sách sản phẩm Excel/CSV,Một phần,commerce-api.js,Import/export CSV; chưa XLSX.
+UC-095,G,Quản lý sản phẩm combo/bundle,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa combo/bundle.
+UC-096,G,"Quản lý sản phẩm đặt trước, hàng sắp về",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa preorder.
+UC-097,G,Thiết lập giới hạn mua,Một phần,commerce-api.js,"Giới hạn cứng 99/dòng, 50 dòng; chưa cấu hình theo SKU/khách."
+UC-098,G,Quản lý giá theo nhóm khách hàng/kênh bán,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa bảng giá theo nhóm/kênh.
+UC-099,H,"Xem, tìm kiếm, lọc đơn hàng",Một phần,commerce-api.js,Tìm mã/tên/điện thoại và trạng thái; chưa lọc ngày/kênh.
+UC-100,H,Tạo đơn hàng thủ công,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa nhân viên tạo đơn thay khách.
+UC-101,H,Xác nhận và xử lý đơn,Có,commerce-api.js,Chuyển trạng thái theo chuỗi cho phép.
+UC-102,H,Phân công nhân viên xử lý,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa gán người xử lý đơn.
+UC-103,H,Cập nhật trạng thái đơn,Có,commerce-api.js,pending→confirmed→shipped→completed; hủy theo điều kiện.
+UC-104,H,Tách/gộp đơn theo quy tắc nghiệp vụ,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa tách/gộp đơn.
+UC-105,H,"Kiểm tra, giữ chỗ hàng tồn",Một phần,commerce-api.js,Trừ stock khi tạo đơn; chưa tách on_hand/reserved/available.
+UC-106,H,"In hóa đơn bán hàng, phiếu giao hàng",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa mẫu in hóa đơn/phiếu giao.
+UC-107,H,In tem vận đơn,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa in tem vận chuyển.
+UC-108,H,Quét mã đơn để xác nhận đóng gói,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa quét mã đóng gói.
+UC-109,H,Ghi hình/video đóng gói và liên kết đơn,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa liên kết video đóng gói.
+UC-110,H,Bàn giao đơn cho vận chuyển,Một phần,commerce-api.js,Cập nhật vận đơn/trạng thái bằng tay; chưa bàn giao điện tử.
+UC-111,H,Xử lý đơn giao thất bại,Một phần,commerce-api.js,Có trạng thái failed; chưa tác vụ giao lại/đối soát.
+UC-112,H,"Xử lý hủy đơn, hoàn hàng, hoàn tiền",Một phần,commerce-api.js,Hủy/return/ledger hoàn tiền; chưa chuyển tiền thật hoặc trả từng dòng.
+UC-113,H,"Xử lý giao thiếu, giao sai, thất lạc",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa quy trình giao thiếu/sai/thất lạc.
+UC-114,H,Ghi nhật ký thay đổi đơn hàng,Có,commerce-store.js,Lịch sử trạng thái và thu/hoàn/vận đơn trong DB.
+UC-115,I,Quản lý một hoặc nhiều kho,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa thực thể kho/chi nhánh.
+UC-116,I,Nhập kho,Một phần,commerce-api.js,Tăng tồn có lý do; chưa phiếu nhập.
+UC-117,I,Xuất kho,Một phần,commerce-api.js,Đặt hàng/điều chỉnh giảm tồn; chưa phiếu xuất kho.
+UC-118,I,Chuyển kho,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa chuyển kho.
+UC-119,I,Kiểm kê,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa phiếu kiểm kê.
+UC-120,I,Điều chỉnh tồn kho có phê duyệt,Một phần,commerce-api.js,Điều chỉnh có lý do/người làm; chưa phê duyệt theo hạn mức.
+UC-121,I,"Theo dõi tồn thực tế, tồn khả dụng, tồn giữ chỗ",Một phần,commerce-store.js,Stock là tồn bán còn lại; chưa tồn vật lý và giữ chỗ tách biệt.
+UC-122,I,Quản lý vị trí kệ/bin,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa vị trí kệ/bin.
+UC-123,I,Cảnh báo hàng sắp hết,Một phần,commerce-api.js,Cảnh báo dưới 5; chưa cấu hình ngưỡng theo SKU.
+UC-124,I,"Quản lý hàng hư hỏng, hàng hoàn",Một phần,commerce-api.js,Chọn có nhập lại hàng trả; chưa kho hư hỏng hay tồn cách ly.
+UC-125,I,"Quản lý lô, hạn sử dụng, serial/IMEI",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa lô/hạn dùng/serial.
+UC-126,I,Quản lý quy trình lấy hàng – đóng gói,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa picking/packing.
+UC-127,I,Nhận và kiểm tra hàng hoàn,Một phần,commerce-api.js,Bước received và nhập lại; chưa kiểm từng dòng/chứng cứ.
+UC-128,I,Đồng bộ tồn kho giữa các kênh,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa đồng bộ tồn đa kênh.
+UC-129,I,Theo dõi lịch sử nhập – xuất – tồn,Có,commerce-api.js,"Lịch sử delta, lý do, actor, thời điểm; API giới hạn 300 dòng gần nhất."
+UC-130,I,Báo cáo chênh lệch tồn và tồn lâu ngày,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa báo cáo chênh lệch/tuổi tồn.
+UC-131,J,Quản lý nhà cung cấp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-132,J,Tạo yêu cầu mua hàng,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-133,J,Tạo và phê duyệt đơn đặt mua (PO),Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-134,J,Theo dõi giao hàng từ nhà cung cấp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-135,J,Nhận hàng theo PO,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-136,J,Kiểm tra chất lượng hàng nhập,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-137,J,Đối chiếu PO – nhập kho – hóa đơn,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-138,J,Quản lý công nợ nhà cung cấp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-139,J,Trả hàng nhà cung cấp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-140,J,"Báo cáo mua hàng, giá nhập",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa module nhà cung cấp/mua hàng/PO/công nợ nhà cung cấp.
+UC-141,K,Cấu hình đơn vị vận chuyển,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa cấu hình carrier adapter.
+UC-142,K,Tính phí giao hàng,Có,commerce-api.js,Tính phí theo quy tắc nội bộ.
+UC-143,K,Thiết lập phí vận chuyển theo khu vực,Có,commerce-api.js,Phí theo vùng cấu hình; địa chỉ Việt Nam chuẩn hóa.
+UC-144,K,Chính sách miễn phí vận chuyển,Có,commerce-api.js,Miễn phí theo ngưỡng cấu hình.
+UC-145,K,Tạo đơn vận chuyển qua API,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa API tạo vận đơn.
+UC-146,K,Tạo/in mã vận đơn,Một phần,commerce-api.js,Lưu mã nhập tay; chưa tạo/in tem.
+UC-147,K,Theo dõi vận chuyển,Một phần,public/commerce-ui.js,Hiện trạng thái/link nhập tay; chưa cập nhật tự động.
+UC-148,K,Đồng bộ trạng thái giao hàng qua webhook/API,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa carrier webhook.
+UC-149,K,Quản lý COD và tiền thu hộ,Một phần,commerce-api.js,Ghi nhận receipt COD; chưa bảng kê tiền đang do hãng giữ.
+UC-150,K,Đối soát phí vận chuyển,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa đối soát phí giao.
+UC-151,K,"Quản lý giao thất bại, hoàn hàng",Một phần,commerce-api.js,Trạng thái failed/returned; chưa nghiệp vụ logistics đầy đủ.
+UC-152,K,Xử lý yêu cầu giao lại,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa yêu cầu giao lại.
+UC-153,L,Tạo mã giảm giá,Có,commerce-api.js,"Voucher thời hạn, giới hạn lượt/khách, sản phẩm và mức tối đa."
+UC-154,L,Cấu hình Flash Sale,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa flash sale.
+UC-155,L,Giảm giá theo sản phẩm/danh mục,Một phần,commerce-api.js,Coupon áp cho product_ids; chưa lịch giá giảm tự động/danh mục.
+UC-156,L,"Mua X tặng Y, combo ưu đãi",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa mua X tặng Y.
+UC-157,L,Miễn phí vận chuyển,Có,commerce-api.js,Miễn phí theo ngưỡng; chưa coupon miễn ship riêng.
+UC-158,L,Tích điểm thành viên,Có,commerce-api.js,Ledger điểm sau completed và paid; mặc định tắt.
+UC-159,L,Đổi điểm lấy ưu đãi,Có,commerce-api.js,"Đổi điểm có kiểm số dư, giới hạn giá trị hàng."
+UC-160,L,Phân hạng thành viên,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa hạng thành viên.
+UC-161,L,Chương trình giới thiệu bạn bè,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa referral.
+UC-162,L,Email/SMS Marketing,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa chiến dịch email/SMS và consent.
+UC-163,L,Giỏ hàng bỏ quên,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa giỏ máy chủ để theo dõi bỏ quên.
+UC-164,L,Quản lý Affiliate/KOL/KOC,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa affiliate/KOC.
+UC-165,L,"Quản lý banner, landing page",Một phần,server.js,Hero/banner và trang nội dung tab; chưa trình dựng landing page.
+UC-166,L,Đo lường mã giảm giá và chiến dịch,Một phần,commerce-api.js,Đơn lưu coupon/discount; chưa báo cáo hiệu quả chiến dịch riêng.
+UC-167,M,Theo dõi đơn đã thanh toán/chưa thanh toán,Có,commerce-store.js,payment_status tách trạng thái xử lý đơn.
+UC-168,M,Quản lý giao dịch thanh toán,Có,commerce-api.js,"Ledger receipt/refund, mã tham chiếu duy nhất."
+UC-169,M,Quản lý COD và các khoản phải thu,Một phần,commerce-api.js,Tổng đơn còn phải thu; chưa tài khoản công nợ COD hãng.
+UC-170,M,Đối soát cổng thanh toán/ngân hàng,Một phần,commerce-api.js,Đối soát thủ công và VNPay local; chưa sao kê ngân hàng tự động.
+UC-171,M,Đối soát tiền thu hộ COD,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa bảng kê COD từ hãng.
+UC-172,M,Quản lý hoàn tiền,Một phần,commerce-api.js,Ghi nhận hoàn từng phần có chặn vượt thu; không tự chuyển tiền.
+UC-173,M,Quản lý hóa đơn điện tử qua nhà cung cấp tích hợp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa nhà cung cấp hóa đơn điện tử.
+UC-174,M,Quản lý thông tin xuất hóa đơn,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa thông tin xuất hóa đơn.
+UC-175,M,Theo dõi doanh thu theo kênh,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa dữ liệu kênh bán và báo cáo theo kênh.
+UC-176,M,Quản lý giá vốn hàng bán,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa giá vốn/COGS.
+UC-177,M,Thống kê lợi nhuận gộp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa lợi nhuận gộp.
+UC-178,M,"Theo dõi chiết khấu, phí thanh toán, phí sàn",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa phí cổng/sàn/chiết khấu.
+UC-179,M,Quản lý công nợ khách hàng doanh nghiệp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa công nợ B2B.
+UC-180,M,Xuất dữ liệu kế toán và chứng từ đối soát,Một phần,commerce-api.js,Xuất đơn CSV; chưa sổ kế toán/chứng từ đối soát đầy đủ.
+UC-181,N,Dashboard tổng quan,Có,commerce-api.js,"Dashboard thu/hoàn/thu ròng, trạng thái đơn, tồn thấp, outbox."
+UC-182,N,Báo cáo doanh thu theo ngày/tháng/năm,Một phần,commerce-api.js,Tổng thu/hoàn; chưa báo cáo theo ngày/tháng/năm.
+UC-183,N,Báo cáo đơn hàng theo trạng thái,Có,commerce-api.js,Đếm và tổng giá trị đơn theo trạng thái.
+UC-184,N,Báo cáo sản phẩm bán chạy,Một phần,server.js,Collection bán chạy theo lượng đơn completed; chưa báo cáo có kỳ.
+UC-185,N,Báo cáo sản phẩm tồn lâu,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa dữ liệu tuổi tồn.
+UC-186,N,Báo cáo nhập – xuất – tồn,Một phần,commerce-api.js,Nhật ký delta; chưa báo cáo tồn đầu/nhập/xuất/cuối theo kỳ.
+UC-187,N,Báo cáo khách hàng mới/quay lại,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa phân tích khách mới/quay lại.
+UC-188,N,Báo cáo giá trị đơn trung bình,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa metric giá trị đơn trung bình riêng.
+UC-189,N,Báo cáo chuyển đổi và giỏ hàng bỏ quên,Một phần,commerce-api.js,Đếm event 30 ngày; không có session attribution/giỏ bỏ quên nên chưa tỷ lệ chuyển đổi tin cậy.
+UC-190,N,Báo cáo hiệu quả Marketing,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa attribution/chi phí chiến dịch.
+UC-191,N,"Báo cáo hủy đơn, đổi trả",Một phần,commerce-api.js,Số đơn hủy và danh sách return; chưa báo cáo tỷ lệ/kỳ.
+UC-192,N,Báo cáo lợi nhuận theo sản phẩm/kênh,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa giá vốn/chi phí/kênh để tính lợi nhuận.
+UC-193,N,"Báo cáo công nợ, thanh toán",Một phần,commerce-api.js,Số tiền chưa thu/đã thu/hoàn; chưa aging công nợ.
+UC-194,N,"Xuất Excel, CSV, PDF",Một phần,commerce-api.js,CSV sản phẩm/đơn; chưa Excel/PDF/báo cáo toàn bộ.
+UC-195,N,Lên lịch gửi báo cáo tự động,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa lịch gửi báo cáo.
+UC-196,N,So sánh kết quả theo kỳ,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa so sánh kỳ.
+UC-197,O,Quản lý tài khoản nhân viên,Một phần,commerce-api.js,Gán quyền tài khoản đã đăng ký; chưa tạo/invite/khóa nhân viên.
+UC-198,O,Phân quyền theo vai trò (RBAC),Một phần,server.js,Vai trò cố định admin/sales/inventory/editor; chưa quyền chi tiết/vai trò tùy chỉnh.
+UC-199,O,"Phân quyền theo kho, chi nhánh",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chưa scope kho/chi nhánh.
+UC-200,O,Quản lý menu và nội dung website,Có,server.js,"Menu/navigation, nội dung và bật/tắt tab."
+UC-201,O,"Quản lý trang giới thiệu, liên hệ, chính sách",Một phần,server.js,Trang nội dung/chính sách có; còn dữ liệu mẫu và chưa version/chấp thuận.
+UC-202,O,Cấu hình thông tin cửa hàng,Có,server.js,"Thông tin cửa hàng, logo, màu, liên hệ."
+UC-203,O,"Cấu hình thanh toán, vận chuyển",Một phần,server.js,Bank/phí giao trong admin; gateway qua biến môi trường; chưa hãng vận chuyển.
+UC-204,O,Cấu hình email/SMS/thông báo,Một phần,scripts/process-outbox.js,Email qua biến môi trường và worker; chưa SMS/thông báo cấu hình UI.
+UC-205,O,"Quản lý SEO, URL, sitemap",Có,seo.js,"URL sản phẩm, canonical, metadata, JSON-LD, sitemap, robots."
+UC-206,O,"Quản lý đa ngôn ngữ, đa tiền tệ",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,Chỉ tiếng Việt/VND; chưa đa ngôn ngữ/tiền tệ.
+UC-207,O,Nhật ký hệ thống (Audit Log),Một phần,commerce-store.js,"Audit có actor/action/target/note; thiếu old/new, request ID và bất biến."
+UC-208,O,Quản lý API Key và kết nối bên thứ ba,Một phần,payments.js,Khóa qua môi trường; chưa quản lý binding/rotation/connection health.
+UC-209,O,"Bảo mật, xác thực hai yếu tố cho nhân viên",Một phần,commerce-api.js,MFA TOTP/recovery hoạt động; chưa bắt buộc cho staff; seed chưa mã hóa at rest.
+UC-210,O,Sao lưu và khôi phục dữ liệu,Một phần,scripts/backup.js,Backup DB/uploads có script; chưa lịch/offsite và bài kiểm tra restore hoàn chỉnh.
+UC-211,O,"Giám sát lỗi, hiệu năng, sự kiện bảo mật",Một phần,server.js,healthz và log lỗi cơ bản; chưa giám sát/cảnh báo tập trung.
+UC-212,O,Quản lý chính sách dữ liệu và thời hạn lưu trữ,Một phần,scripts/maintenance.js,"Xóa token/session hết hạn, chat >30 ngày; chưa chính sách retention toàn bộ/DSAR."
+UC-213,P,Tích hợp cổng thanh toán,Một phần,payments.js,Adapter VNPay và test local; chưa tích hợp merchant thực.
+UC-214,P,Tích hợp đơn vị vận chuyển,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-215,P,Tích hợp Shopee,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-216,P,Tích hợp TikTok Shop,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-217,P,Đồng bộ đơn hàng đa kênh,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-218,P,"Đồng bộ sản phẩm, giá, tồn kho",Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-219,P,Tích hợp BigSeller/ERP/WMS nếu API hỗ trợ,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-220,P,Tích hợp phần mềm kế toán,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-221,P,Tích hợp hóa đơn điện tử,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-222,P,Tích hợp POS bán hàng trực tiếp,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-223,P,Tích hợp hệ thống camera đóng gói,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-224,P,Tích hợp CRM,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-225,P,Tích hợp chatbot AI,Một phần,commerce-api.js,Adapter OpenAI và catalog fallback; chưa cấu hình hoặc test mô hình thật.
+UC-226,P,Quản lý livestream/đơn livestream,Chưa,Rà soát server.js; commerce-api.js; commerce-store.js; public/app.js; public/commerce-ui.js; scripts/,"Chưa adapter, bảng ánh xạ và luồng đồng bộ tương ứng."
+UC-227,P,Mở API cho ứng dụng mobile,Một phần,server.js,Có JSON API cho web; chưa hợp đồng/version/auth mobile chuyên dụng.
+UC-228,P,"Webhook sự kiện đơn hàng, thanh toán, kho",Một phần,payments.js,Chỉ IPN VNPay; chưa webhook ra ngoài cho order/kho.

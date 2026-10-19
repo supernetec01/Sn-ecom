@@ -1,3 +1,6 @@
+import { migrateCommerce } from './commerce-store.js';
+import { registerCatalogFunctions } from './catalog.js';
+import { migrateTranslations } from './translations.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -108,13 +111,13 @@ export function seedDemoCatalog(db) {
 export function hashPassword(password) { const salt=randomBytes(16).toString('hex'); return `${salt}:${scryptSync(password,salt,64).toString('hex')}`; }
 export function checkPassword(password, hash) { try {const [salt,key]=hash.split(':'); return timingSafeEqual(Buffer.from(key,'hex'),scryptSync(password,salt,64));}catch{return false;} }
 export function openStore(dir=process.env.DATA_DIR || './data') {
- mkdirSync(dir,{recursive:true,mode:0o700}); const db=new DatabaseSync(path.join(dir,'store.sqlite')); db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+ mkdirSync(dir,{recursive:true,mode:0o700}); const db=new DatabaseSync(path.join(dir,'store.sqlite')); registerCatalogFunctions(db); db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
  CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,password TEXT NOT NULL,role TEXT NOT NULL DEFAULT 'customer');
- CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY,actor_id INTEGER REFERENCES users(id),action TEXT NOT NULL,entity TEXT NOT NULL,entity_id TEXT NOT NULL,details TEXT NOT NULL,created TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),csrf TEXT NOT NULL,expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,description TEXT NOT NULL,price INTEGER NOT NULL CHECK(price>=0),stock INTEGER NOT NULL CHECK(stock>=0),image TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,details TEXT NOT NULL DEFAULT '{}');
  CREATE TABLE IF NOT EXISTS demo_catalog_seed(sku TEXT PRIMARY KEY,product_id INTEGER);
+ CREATE TABLE IF NOT EXISTS checkout_requests(user_id INTEGER NOT NULL REFERENCES users(id),request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,response TEXT NOT NULL,PRIMARY KEY(user_id,request_key));
  CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),created TEXT NOT NULL,status TEXT NOT NULL,total INTEGER NOT NULL,shipping INTEGER NOT NULL,payment TEXT NOT NULL,recipient TEXT NOT NULL,address TEXT NOT NULL,phone TEXT NOT NULL,items TEXT NOT NULL,bank TEXT NOT NULL);
  `);
  if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'disabled')) db.exec('ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
@@ -135,5 +138,7 @@ export function openStore(dir=process.env.DATA_DIR || './data') {
  if(!Object.hasOwn(existing,'navigation')){existing.navigation=defaultNavigation;changed=true;}
  if(changed)db.prepare('UPDATE settings SET value=? WHERE id=1').run(JSON.stringify(existing));
  if(initialized.changes && db.prepare('SELECT COUNT(*) AS count FROM products').get().count===0) seedDemoCatalog(db);
+ migrateCommerce(db);
+ migrateTranslations(db);
  return db;
 }

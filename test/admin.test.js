@@ -151,7 +151,7 @@ test('Additive admin migration preserves previous accounts, sessions and setting
     const users = db.prepare('SELECT id,name,email,password,role FROM users').all();
     db.close();
     db = new DatabaseSync(join(dir, 'store.sqlite'));
-    db.exec('DROP TABLE audit_log; ALTER TABLE users DROP COLUMN disabled; ALTER TABLE settings DROP COLUMN revision;'); db.close();
+    db.exec('ALTER TABLE users DROP COLUMN disabled; ALTER TABLE settings DROP COLUMN revision;'); db.close();
     db = openStore(dir);
     assert.deepEqual(db.prepare('SELECT id,name,email,password,role FROM users').all(), users);
     assert.equal(db.prepare('SELECT disabled FROM users').get().disabled, 0);
@@ -159,4 +159,51 @@ test('Additive admin migration preserves previous accounts, sessions and setting
     assert.equal(db.prepare('SELECT value FROM settings').get().value, settings);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM audit_log').get().count, 0);
   } finally { db?.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Extended commerce endpoints share the role gate; changing credentials also revokes pending recovery links', async () => {
+  const f = await fixture(); const { request, login, db, ids } = f;
+  try {
+    const admin = await login('admin'), manager = await login('manager'), editor = await login('editor');
+    for (const path of ['/admin/inventory', '/admin/returns', '/admin/coupons', '/admin/reviews', '/admin/overview', '/admin/analytics']) {
+      assert.equal((await request(path, manager)).status, 200, path);
+    }
+    for (const path of ['/admin/inventory', '/admin/returns', '/admin/order-list', '/admin/overview', '/admin/commerce', '/admin/outbox']) assert.equal((await request(path, editor)).status, 403, path);
+    for (const path of ['/admin/coupons', '/admin/reviews']) assert.equal((await request(path, editor)).status, 200, path);
+    for (const role of ['sales', 'inventory']) {
+      const id = Number(db.prepare('INSERT INTO users(name,email,password,role) VALUES(?,?,?,?)').run(role, role+'@example.test', hashPassword(f.password), role).lastInsertRowid);
+      const ctx = await login(role);
+      assert.equal((await request(role === 'sales' ? '/admin/orders' : '/admin/inventory', ctx)).status, 200);
+      assert.equal((await request(role === 'sales' ? '/admin/products' : '/admin/orders', ctx)).status, 403);
+      assert.equal((await request('/admin/settings', { ...ctx, method: 'PUT', body: {} })).status, 403);
+      assert.equal((await request('/admin/users/'+id+'/role', { ...ctx, method: 'PATCH', body: { role: 'admin' } })).status, 403);
+    }
+    assert.equal((await request('/admin/unknown-new-endpoint', manager)).status, 403);
+    db.prepare('INSERT INTO account_tokens VALUES(?,?,?,?)').run('pending-reset', ids.customer, 'reset', Date.now()+60000);
+    assert.equal((await request('/admin/users/'+ids.customer+'/password', { ...admin, method: 'POST', body: { password: randomBytes(20).toString('hex') } })).status, 200);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM account_tokens WHERE user_id=?').get(ids.customer).count, 0);
+    db.prepare('INSERT INTO account_tokens VALUES(?,?,?,?)').run('pending-verify', ids.manager, 'verify', Date.now()+60000);
+    db.prepare('UPDATE users SET verified=1 WHERE id=?').run(ids.manager);
+    assert.equal((await request('/admin/users/'+ids.manager, { ...admin, method: 'PATCH', body: { name: 'Manager', email: 'changed@example.test', role: 'manager', disabled: false } })).status, 200);
+    assert.equal(db.prepare('SELECT verified FROM users WHERE id=?').get(ids.manager).verified, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM account_tokens WHERE user_id=?').get(ids.manager).count, 0);
+    // Existing commerce notes can contain plain text that happens to be valid JSON.
+    db.prepare('INSERT INTO audit_log(actor,action,target,note,created) VALUES(?,?,?,?,?)').run(ids.admin,'stock','1','null',new Date().toISOString());
+    assert.equal((await request('/admin/audit', admin)).status, 200);
+  } finally { await f.close(); }
+});
+
+test('New password dialog contract preserves MFA and cannot bypass a second factor', async () => {
+  const { totpSecret, totpCode } = await import('../commerce-store.js');
+  const f = await fixture(); const { request, login, db, ids, password } = f;
+  try {
+    const ctx = await login('admin'), secret = totpSecret(), next = randomBytes(20).toString('hex');
+    db.prepare('UPDATE users SET totp_secret=? WHERE id=?').run(secret, ids.admin);
+    assert.equal((await request('/account/password', { ...ctx, method: 'POST', body: { currentPassword: password, newPassword: next } })).status, 401);
+    assert.ok(checkPassword(password, db.prepare('SELECT password FROM users WHERE id=?').get(ids.admin).password));
+    assert.equal((await request('/account/password', { ...ctx, method: 'POST', body: { currentPassword: password, newPassword: next, otp: totpCode(secret) } })).status, 200);
+    assert.equal((await request('/admin/dashboard', ctx)).status, 401);
+    assert.equal(db.prepare('SELECT totp_secret FROM users WHERE id=?').get(ids.admin).totp_secret, secret);
+    assert.equal((await request('/login', { method: 'POST', body: { email: 'admin@example.test', password: next } })).status, 401);
+  } finally { await f.close(); }
 });

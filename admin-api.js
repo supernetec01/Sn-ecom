@@ -1,5 +1,5 @@
 import { roles, publicUser, audit, transaction } from './access.js';
-import { hashPassword, checkPassword } from './store.js';
+import { hashPassword } from './store.js';
 
 const text = (value, max = 200) => typeof value === 'string' && value.length <= max;
 const emailValid = value => text(value, 254) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -86,7 +86,7 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
   app.get('/api/admin/users', permit('users.manage'), (req, res) => {
     const q = String(req.query.q || '').slice(0, 200), role = String(req.query.role || ''), status = String(req.query.status || '');
     const page = Math.min(100000, Math.max(1, Number.parseInt(req.query.page, 10) || 1)), pageSize = 20;
-    const where = [], args = [];
+    const where = ["role!='guest'"], args = [];
     if (q) { where.push('(name LIKE ? ESCAPE \'\\\' OR email LIKE ? ESCAPE \'\\\')'); const pattern = '%' + q.replace(/[\\%_]/g, value => '\\' + value) + '%'; args.push(pattern, pattern); }
     if (Object.hasOwn(roles, role)) { where.push('role=?'); args.push(role); }
     if (['active', 'disabled'].includes(status)) { where.push('disabled=?'); args.push(status === 'disabled' ? 1 : 0); }
@@ -109,11 +109,15 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
     if (!validId(req.params.id) || !exact(req.body, ['name', 'email', 'role', 'disabled']) || !text(name, 100) || !name.trim() || !emailValid(email) || !Object.hasOwn(roles, role) || typeof disabled !== 'boolean') return fail(res, 'Thông tin tài khoản không hợp lệ.');
     const id = Number(req.params.id);
     transaction(db, () => {
-      const old = db.prepare('SELECT * FROM users WHERE id=?').get(id); if (!old) reject('Không tìm thấy tài khoản.', 404);
+      const old = db.prepare('SELECT * FROM users WHERE id=?').get(id); if (!old || old.role === 'guest') reject('Không tìm thấy tài khoản.', 404);
       if (id === req.session.user_id && (role !== old.role || disabled)) reject('Bạn không thể tự khóa hoặc thay đổi vai trò của chính mình.', 409);
       if (old.role === 'admin' && !old.disabled && (role !== 'admin' || disabled) && db.prepare("SELECT COUNT(*) AS count FROM users WHERE role='admin' AND disabled=0").get().count <= 1) reject('Phải giữ ít nhất một quản trị viên hoạt động.', 409);
       db.prepare('UPDATE users SET name=?,email=?,role=?,disabled=? WHERE id=?').run(name.trim(), email.trim().toLowerCase(), role, disabled ? 1 : 0, id);
-      if (role !== old.role || disabled !== Boolean(old.disabled) || email.trim().toLowerCase() !== old.email) db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
+      if (role !== old.role || disabled !== Boolean(old.disabled) || email.trim().toLowerCase() !== old.email) {
+        db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
+        db.prepare('DELETE FROM account_tokens WHERE user_id=?').run(id);
+      }
+      if (email.trim().toLowerCase() !== old.email) db.prepare('UPDATE users SET verified=0 WHERE id=?').run(id);
       audit(db, req.session.user_id, 'user.update', 'user', id, { fromRole: old.role, role, disabled });
     }); res.json({ ok: true });
   }));
@@ -123,22 +127,15 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
     const id = Number(req.params.id);
     if (id === req.session.user_id) return fail(res, 'Dùng mục Đổi mật khẩu để xác nhận mật khẩu hiện tại của bạn.');
     transaction(db, () => {
-      if (!db.prepare('SELECT id FROM users WHERE id=?').get(id)) reject('Không tìm thấy tài khoản.', 404);
+      if (!db.prepare("SELECT id FROM users WHERE id=? AND role!='guest'").get(id)) reject('Không tìm thấy tài khoản.', 404);
       db.prepare('UPDATE users SET password=? WHERE id=?').run(hashPassword(password), id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
+      db.prepare("DELETE FROM account_tokens WHERE user_id=? AND kind='reset'").run(id);
       audit(db, req.session.user_id, 'user.password_reset', 'user', id);
     }); res.json({ ok: true });
   }));
-  app.post('/api/account/password', auth, csrf, passwordLimit, safely((req, res) => {
-    const { currentPassword, newPassword } = req.body;
-    if (!exact(req.body, ['currentPassword', 'newPassword']) || !text(currentPassword, 128) || !text(newPassword, 128) || newPassword.length < 12 || currentPassword === newPassword) return fail(res, 'Nhập mật khẩu hiện tại và mật khẩu mới khác, từ 12–128 ký tự.');
-    const user = db.prepare('SELECT password FROM users WHERE id=?').get(req.session.user_id);
-    if (!user || !checkPassword(currentPassword, user.password)) return fail(res, 'Mật khẩu hiện tại không đúng.', 401);
-    transaction(db, () => {
-      db.prepare('UPDATE users SET password=? WHERE id=?').run(hashPassword(newPassword), req.session.user_id);
-      db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.session.user_id);
-      audit(db, req.session.user_id, 'user.password_change', 'user', req.session.user_id);
-    }); res.clearCookie('sn_session', { path: '/' }).json({ ok: true, reauthenticate: true });
-  }));
-  app.get('/api/admin/audit', permit('audit.read'), (req, res) => res.json(db.prepare('SELECT a.id,a.action,a.entity,a.entity_id,a.details,a.created,u.name AS actor FROM audit_log a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 100').all().map(row => ({ ...row, details: JSON.parse(row.details) }))));
+  app.get('/api/admin/audit', permit('audit.read'), (req, res) => res.json(db.prepare('SELECT a.*,u.name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 100').all().map(row => {
+    let data = {}; try { const parsed = JSON.parse(row.note); if (parsed && typeof parsed === 'object') data = parsed; } catch {}
+    return { id: row.id, action: row.action, actor: row.actor_name, created: row.created, entity: data.entity || 'Dữ liệu', entity_id: data.entity_id || row.target, details: data.details || {} };
+  })));
 }
