@@ -17,6 +17,10 @@ Mặc định cổng 3000. Tạo quản trị viên bằng `npm run admin` trong
 
 Yêu cầu **Node.js 24 trở lên** vì ứng dụng sử dụng module tích hợp `node:sqlite`. Node 18 không chạy được. Trên Windows, sau khi cài Node mới, đóng toàn bộ VS Code và mở lại rồi kiểm tra `node --version`.
 
+## Demo miễn phí để chia sẻ
+
+Chạy trên máy Windows và dùng Cloudflare Quick Tunnel để có link HTTPS miễn phí. Sau khi cài cloudflared, tạo admin riêng bằng `npm.cmd run demo:admin`, rồi chạy **`npm.cmd run demo`**. Công cụ tự cấu hình địa chỉ website, kiểm tra link công khai và in link để chia sẻ; Ctrl+C dừng cả website và tunnel. Dữ liệu nằm riêng trong `data/demo/`, không thay DB website hiện có. Xem [các bước PowerShell và cách xử lý lỗi](docs/free-demo.md).
+
 ## Cập nhật website đang sử dụng trên Windows
 
 Dừng website bằng **Ctrl + C**, mở terminal trong thư mục dự án và chạy:

@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "demo": "node scripts/demo.js",
+    "demo:admin": "node scripts/demo-admin.js",
     "test": "node --test",
     "admin": "node scripts/admin.js",
     "seed:demo": "node scripts/seed-demo.js",

@@ -49,6 +49,8 @@ function validateSettings(s,old) {
 const digest=v=>createHash('sha256').update(v).digest('hex');
 export function createApp(db=openStore(), { translation = {} } = {}) {
  const app=express(); app.disable('x-powered-by');
+ // Only enable this for a proxy on the same machine, e.g. the demo tunnel.
+ if(process.env.TRUST_PROXY==='loopback')app.set('trust proxy','loopback');
  app.use(helmet({contentSecurityPolicy:{directives:{'img-src':["'self'",'https:'],'script-src':["'self'"],'style-src':["'self'","'unsafe-inline'"],'upgrade-insecure-requests':process.env.NODE_ENV==='production'?[]:null}}}));
  app.use(express.json({limit:'128kb'}));
  app.get('/healthz',(_req,res)=>{try{db.prepare('SELECT 1').get();res.json({status:'ok'});}catch{res.status(503).json({status:'unavailable'});}});
@@ -159,4 +161,4 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
  app.use((err,req,res,next)=>{if(err instanceof SyntaxError||err.type==='entity.too.large')return fail(res,'Dữ liệu không hợp lệ.');console.error('Request failed:',err.code||err.name);fail(res,'Lỗi xử lý yêu cầu.',500);});
  return app;
 }
-if(process.argv[1]===fileURLToPath(import.meta.url)){const db=openStore();expireOrders(db);createApp(db).listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Super Net server started on port '+(process.env.PORT||3000)));setInterval(()=>{try{expireOrders(db);}catch{console.error('Order expiry failed');}},60000).unref();}
+if(process.argv[1]===fileURLToPath(import.meta.url)){const db=openStore();expireOrders(db);createApp(db).listen(Number(process.env.PORT||3000),process.env.HOST||'0.0.0.0',()=>console.log('Super Net server started on port '+(process.env.PORT||3000)));setInterval(()=>{try{expireOrders(db);}catch{console.error('Order expiry failed');}},60000).unref();}
