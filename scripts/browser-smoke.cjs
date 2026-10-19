@@ -33,7 +33,7 @@ const {once}=require('node:events');
   await route('manage/inventory');
   let variantForm=page.locator('form[data-action="/admin/variants/'+variant.id+'"]');
   await variantForm.locator('..').locator('summary').click();await variantForm.locator('[name=active]').selectOption('0');
-  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/admin/variants/'+variant.id)&&r.request().method()==='PUT'),variantForm.locator('button.primary').click()]);
+  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/admin/variants/'+variant.id)&&r.request().method()==='PATCH'),variantForm.locator('button.primary').click()]);
   await page.waitForFunction(()=>document.querySelector('form[data-action^="/admin/variants/"] [name=active]')?.value==='0');
   await route('product/'+variant.product_id);await page.locator('#variant-picker').waitFor();
   assert.equal(await page.locator('#detail-add').isDisabled(),true);assert.equal(await page.locator('#variant-picker option').count(),1);
@@ -41,7 +41,7 @@ const {once}=require('node:events');
   await route('manage/inventory');variantForm=page.locator('form[data-action="/admin/variants/'+variant.id+'"]');
   await variantForm.locator('..').locator('summary').click();assert.equal(await variantForm.locator('[name=active]').inputValue(),'0');
   await variantForm.locator('[name=active]').selectOption('1');
-  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/admin/variants/'+variant.id)&&r.request().method()==='PUT'),variantForm.locator('button.primary').click()]);
+  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/admin/variants/'+variant.id)&&r.request().method()==='PATCH'),variantForm.locator('button.primary').click()]);
   await page.waitForFunction(()=>document.querySelector('form[data-action^="/admin/variants/"] [name=active]')?.value==='1');
   console.log('PASS hiding all variants blocks product and stale-cart checkout; admin can re-enable them');
 

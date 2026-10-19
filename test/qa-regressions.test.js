@@ -51,7 +51,7 @@ test('QA: hidden variants never reopen base SKU sales; re-enabling a variant use
   const variant={sku:'QA-VARIANT-ONLY',label:'QA variant',price:17000,stock:3};
   const created=await request('/admin/products/1/variants',{method:'POST',ctx:admin,body:variant});assert.equal(created.status,201);
   const id=created.data.id;
-  assert.equal((await request('/admin/variants/'+id,{method:'PUT',ctx:admin,body:{...variant,active:0}})).status,200);
+  assert.equal((await request('/admin/variants/'+id,{method:'PUT',ctx:admin,body:{...db.prepare('SELECT * FROM product_variants WHERE id=?').get(id),active:0}})).status,200);
   const detail=await request('/products/1');assert.equal(detail.data.stock,0);assert.equal(detail.data.has_variants,true);assert.deepEqual(detail.data.variants,[]);
   for (const path of ['/products','/catalog']) {
     const result=await request(path),rows=Array.isArray(result.data)?result.data:result.data.items;
@@ -66,7 +66,7 @@ test('QA: hidden variants never reopen base SKU sales; re-enabling a variant use
   assert.equal(db.prepare('SELECT stock FROM products WHERE id=1').get().stock,product.stock);
   assert.equal(db.prepare('SELECT stock FROM product_variants WHERE id=?').get(id).stock,3);
   assert.equal((await request('/admin/inventory',{method:'POST',ctx:admin,body:{product_id:1,delta:1,reason:'QA cannot modify base stock'}})).status,400);
-  assert.equal((await request('/admin/variants/'+id,{method:'PUT',ctx:admin,body:{...variant,active:1}})).status,200);
+  assert.equal((await request('/admin/variants/'+id,{method:'PUT',ctx:admin,body:{...db.prepare('SELECT * FROM product_variants WHERE id=?').get(id),active:1}})).status,200);
   const order=await request('/orders',{method:'POST',ctx:customer,key:randomUUID(),body:{...checkout,items:[{id:1,quantity:1,variant_id:id}]}});
   assert.equal(order.status,201);assert.equal(order.data.total,17000+30000);
   assert.equal(db.prepare('SELECT stock FROM product_variants WHERE id=?').get(id).stock,2);
@@ -122,5 +122,5 @@ test('QA: successful price edits record both old and new amounts in the same aud
   const {db,request,admin,product}=await fixture(t);
   assert.equal((await request('/admin/products/1',{method:'PUT',ctx:admin,body:{...product,price:product.price+1000}})).status,200);
   const note=JSON.parse(db.prepare("SELECT note FROM audit_log WHERE action='product_update' ORDER BY id DESC LIMIT 1").get().note);
-  assert.equal(note.before.price,product.price);assert.equal(note.after.price,product.price+1000);
+  assert.equal(note.details.before.price,product.price);assert.equal(note.details.after.price,product.price+1000);
 });

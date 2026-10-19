@@ -73,7 +73,7 @@ test('Legacy migration preserves all records and settings; explicit seeding enri
     const before = db.prepare('SELECT * FROM products ORDER BY id').all().map(row => ({ ...row }));
     db.close();
     db = openStore(dir);
-    assert.deepEqual(db.prepare('SELECT * FROM products ORDER BY id').all().map(({ details, ...row }) => row), before);
+    assert.deepEqual(db.prepare('SELECT * FROM products ORDER BY id').all().map(({ details, revision, stock_revision, ...row }) => row), before);
     let settings = JSON.parse(db.prepare('SELECT value FROM settings').get().value);
     assert.equal(settings.heroTitle, 'Nội dung riêng của cửa hàng');
     assert.equal(settings.shippingFee, 47000);
@@ -85,8 +85,8 @@ test('Legacy migration preserves all records and settings; explicit seeding enri
     settings.editorial.story.title = 'Câu chuyện đã biên tập';
     db.prepare('UPDATE settings SET value=?').run(JSON.stringify(settings));
     assert.deepEqual(seedDemoCatalog(db), { added: sampleCatalog.length - legacySamples.length, enriched: 2, preserved: 2, skipped: 0 });
-    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=1').get() }, { ...before[0], details: '{}' });
-    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=3').get() }, { ...before[2], details: '{}' });
+    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=1').get() }, { ...before[0], details: '{}', revision: 0, stock_revision: 0 });
+    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=3').get() }, { ...before[2], details: '{}', revision: 0, stock_revision: 0 });
     const upgraded = readProduct(db.prepare('SELECT * FROM products WHERE id=2').get());
     assert.equal(upgraded.details.sku, 'SN-KT-001');
     assert.equal(upgraded.price, before[1].price);
@@ -151,7 +151,7 @@ test('Admin can persist rich product and editorial content; nested invalid input
     const edited = { ...product, details: { ...product.details, summary: 'Nội dung đã sửa', is_sample: false, gallery: ['/images/hero-home.webp', 'https://example.com/photo.webp'] } };
     assert.equal((await request('/admin/products/' + product.id, 'PUT', edited)).status, 200);
     assert.deepEqual((await request('/products/' + product.id)).data.details, edited.details);
-    const { details, ...oldClientProduct } = edited;
+    const { details, ...oldClientProduct } = (await request('/products/' + product.id)).data;
     assert.equal((await request('/admin/products/' + product.id, 'PUT', { ...oldClientProduct, price: 123000 })).status, 200);
     assert.deepEqual((await request('/products/' + product.id)).data.details, edited.details);
     const invalid = [null, [], { gallery: ['javascript:alert(1)'] }, { features: ['x'.repeat(501)] }, { is_sample: 'true' }, { specifications: [{ label: 'A', value: 'B', html: 'C' }] }, { unknown: 'value' }];
@@ -162,13 +162,13 @@ test('Admin can persist rich product and editorial content; nested invalid input
     const settings = (await request('/settings')).data;
     settings.editorial.journal.articles[0].body = 'Nội dung bài viết đã sửa.';
     settings.editorial.story.title = 'Câu chuyện mới';
-    assert.equal((await request('/admin/settings', 'PUT', settings)).status, 200);
+    assert.equal((await request('/admin/settings', 'PUT', { ...settings, revision: (await request('/admin/config')).data.revision })).status, 200);
     assert.equal((await request('/settings')).data.editorial.journal.articles[0].body, 'Nội dung bài viết đã sửa.');
     settings.editorial.journal.articles[0].image = 'data:text/html,unsafe';
-    assert.equal((await request('/admin/settings', 'PUT', settings)).status, 400);
+    assert.equal((await request('/admin/settings', 'PUT', { ...settings, revision: (await request('/admin/config')).data.revision })).status, 400);
     settings.editorial.story = null;
-    assert.equal((await request('/admin/settings', 'PUT', settings)).status, 400);
-    await request('/admin/products/' + product.id, 'PUT', { ...edited, active: 0 });
+    assert.equal((await request('/admin/settings', 'PUT', { ...settings, revision: (await request('/admin/config')).data.revision })).status, 400);
+    await request('/admin/products/' + product.id, 'PUT', { ...(await request('/products/' + product.id)).data, active: 0 });
     assert.equal((await request('/products/' + product.id)).status, 404);
     assert.equal((await request('/products')).data.some(p => p.id === product.id), false);
     assert.equal((await request('/admin/products')).data.find(p => p.id === product.id).active, 0);

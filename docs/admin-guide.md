@@ -7,15 +7,15 @@
 Thanh bên chia thành Bán hàng, Nội dung và Thiết lập & nhân sự. Mỗi người chỉ thấy các mục được cấp quyền.
 
 - **Tổng quan**: sản phẩm, hàng sắp hết, đơn chờ xác nhận, giá trị đơn hoàn tất; số đã thu, đã hoàn và thu ròng lấy từ sổ giao dịch. Giá trị đơn hoàn tất không đồng nghĩa với tiền đã thu.
-- **Sản phẩm**: tìm tên/SKU, lọc danh mục và trạng thái/tồn thấp, phân trang và xuất CSV theo bộ lọc. Chọn **Thêm sản phẩm** hoặc **Sửa**; thông tin cơ bản, ảnh và mô tả nằm thành nhóm, thông số bổ sung được thu gọn. Tải ảnh xong phải lưu. Sản phẩm mới mặc định ẩn để chuẩn bị nội dung. Dùng **Ẩn/Hiện** để ngừng/mở bán và giữ lịch sử; thao tác này không ghi đè giá/tồn kho.
+- **Sản phẩm**: tìm tên/SKU, lọc danh mục và trạng thái/tồn thấp, phân trang và xuất CSV theo bộ lọc. Chọn **Thêm sản phẩm** hoặc **Sửa**; thông tin cơ bản, ảnh và mô tả nằm thành nhóm, thông số bổ sung được thu gọn. Tải ảnh xong phải lưu. Khi sửa sản phẩm, số tồn chỉ để tham khảo; điều chỉnh tăng/giảm ở **Kho & biến thể**. Lưu mô tả hoặc giá không ghi lại số tồn lúc mở form. Sản phẩm mới mặc định ẩn để chuẩn bị nội dung. Dùng **Ẩn/Hiện** để ngừng/mở bán và giữ lịch sử; thao tác này không ghi đè giá/tồn kho.
 - **Danh mục**: thêm, đổi tên, xóa danh mục trống. Đổi tên tự cập nhật sản phẩm và ảnh danh mục trong một giao dịch. Phải chuyển sản phẩm đi trước khi xóa danh mục có hàng.
 - **Đơn hàng**: tìm mã đơn/tên người nhận/điện thoại, lọc trạng thái, xuất CSV. Bấm mã đơn để xem hàng, địa chỉ, lịch sử, ghi nhận thu/hoàn tiền và vận đơn. Chỉ ghi nhận tiền sau khi đã kiểm tra thực tế; phần mềm không tự chuyển tiền. Trạng thái đơn và thanh toán độc lập. Hủy trước khi giao và khi chưa thu hoặc đã hoàn tiền; tồn kho được hoàn một lần.
-- **Kho & biến thể**: chọn tên sản phẩm và phiên bản khi điều chỉnh kho, ghi lý do. Mở tên sản phẩm để sửa/thêm phiên bản. Giá/tồn cửa hàng của hàng có biến thể lấy theo phiên bản. Thao tác hàng loạt chọn bằng hộp kiểm; nhập CSV cần xem trước và xác nhận, lỗi một dòng hủy cả lô.
+- **Kho & biến thể**: chọn tên sản phẩm và phiên bản khi điều chỉnh kho, ghi lý do. Mở tên sản phẩm để sửa tên/giá/trạng thái hoặc thêm phiên bản. Tồn ban đầu chỉ nhập khi tạo mới; điều chỉnh tiếp theo phải có số lượng tăng/giảm và lý do. Giá/tồn cửa hàng của hàng có biến thể lấy theo phiên bản. Thao tác hàng loạt chọn bằng hộp kiểm; nhập CSV cần xem trước và xác nhận, lỗi một dòng hủy cả lô. Khi cập nhật sản phẩm đã có, dùng tệp xuất ở mục Kho & biến thể và giữ hai cột `revision`, `stock_revision`; nếu dữ liệu thay đổi sau khi xuất, phải xuất lại rồi đối chiếu. CSV ở bảng Sản phẩm là báo cáo theo bộ lọc, không phải mẫu nhập.
 - **Mã giảm giá / Duyệt đánh giá / Đổi trả**: quản lý chương trình, phản hồi người mua và quy trình trả hàng. Chọn sản phẩm áp dụng bằng hộp kiểm; bỏ trống phạm vi mã giảm giá nghĩa là áp dụng mọi sản phẩm.
 - **Nội dung website**: chọn Thương hiệu & liên hệ, Trang chủ, Menu & các trang, Chính sách hoặc Nhãn giao diện. Các ô nhập có tên rõ ràng; chính sách/bài viết dùng nút thêm/xóa, không cần sửa JSON. Nhấn **Lưu** ở cuối mục đang sửa. Có thông báo thay đổi chưa lưu và xác nhận khi chuyển mục qua menu.
 - **Giao hàng & thanh toán**: phí mặc định, ngưỡng miễn phí và ba trường nhận chuyển khoản. **Quy tắc bán hàng** quản lý phí theo vùng, thời hạn giữ đơn và Rewards. Chỉ admin được thay đổi các mục này.
 - **Email thông báo**: xem hàng đợi và thử lại email lỗi; cần cấu hình dịch vụ và chạy worker theo hướng dẫn vận hành.
-- **Nhật ký hoạt động**: 100 thao tác gần nhất, thời gian và người thực hiện. Giữ lại lịch sử đã có; không lưu mật khẩu mới trong nhật ký.
+- **Nhật ký hoạt động**: 100 thao tác gần nhất, thời gian và người thực hiện. Hiển thị giá, tồn, trạng thái và SKU trước/sau khi có thay đổi. Đọc được cả định dạng nhật ký sản phẩm cũ; giữ lịch sử đã có và không hiển thị mật khẩu hay số tài khoản ngân hàng.
 
 Khi có thông báo dữ liệu cấu hình đã được người khác cập nhật, hệ thống từ chối lưu bản cũ. Sao chép phần đang biên tập nếu cần, chọn **Tải lại**, rồi sửa trên dữ liệu mới nhất. Lưu một mục không ghi đè các mục cấu hình khác.
 
@@ -53,7 +53,17 @@ npm ci
 npm run dev
 ```
 
-Không cần chạy seed hoặc tạo lại admin. Không xóa thư mục `data`. Khởi động sẽ bổ sung cột trạng thái tài khoản và phiên bản cấu hình, giữ sản phẩm/đơn/nội dung/tài khoản cùng nhật ký cũ.
+Không cần chạy seed hoặc tạo lại admin. Không xóa thư mục `data`. Khởi động sẽ bổ sung cột trạng thái tài khoản, phiên bản cấu hình và phiên bản nội dung/tồn kho riêng cho sản phẩm, biến thể, giữ sản phẩm/đơn/nội dung/tài khoản cùng nhật ký cũ.
+
+## Tích hợp API quản trị
+
+- Đọc `/api/admin/products` hoặc `/api/admin/products/:id/variants` để lấy `revision` và `stock_revision`.
+- `PATCH /api/admin/products/:id` nhận `revision` cùng các trường nội dung thay đổi (`name`, `category`, `description`, `price`, `image`, `active`, `details`). `details` gộp theo các trường con được gửi; dùng giá trị rỗng/mảng rỗng để xóa nội dung. Không gửi `stock`.
+- `PATCH /api/admin/variants/:id` nhận `revision` cùng `label`, `price`, `active`; không gửi `stock`.
+- PUT toàn bộ sản phẩm/biến thể cũ yêu cầu cả `revision` và `stock_revision`. Dùng dữ liệu gốc từ API admin (`base_price`, `base_stock` cho sản phẩm có biến thể), không lấy tổng tồn các biến thể để ghi vào sản phẩm cha.
+- Đọc `/api/admin/config` để lấy `{ settings, revision }`. PATCH cấu hình tiếp tục gửi `{ section, values, revision }`. PUT cấu hình cũ gửi `{ ...settings, revision }`. Thêm/đổi tên/xóa danh mục cũng phải gửi `revision` đã đọc.
+- Phiên bản thiếu/không hợp lệ trả `428` ở các đường PUT cũ; phiên bản cũ trả `409`. Không tự lấy phiên bản mới rồi gửi lại dữ liệu cũ. PATCH cấu hình có kiểm tra hình dạng yêu cầu và có thể trả `400` nếu thiếu phiên bản.
+- Lưu thay đổi và nhật ký là một giao dịch. Lỗi lưu nhật ký trả lỗi máy chủ và hoàn tác dữ liệu; duyệt cùng trạng thái đã lưu không tạo nhật ký lặp.
 
 ## Kiểm tra và giới hạn
 

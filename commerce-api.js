@@ -1,3 +1,4 @@
+import { assertRevision, csvRevision } from './concurrency.js';
 import { roles } from './access.js';
 import { assertSkuAvailable, normalizeSku, productVariants } from './catalog.js';
 import { addressMetadata, listProvinces, listWards, validateVietnamAddress } from './vietnam-addresses.js';
@@ -12,7 +13,7 @@ const positive=v=>Number.isSafeInteger(v)&&v>0;
 const image=v=>text(v,2000)&&(v===''||/^\/(?!\/)[\w./-]+$/.test(v)||/^https:\/\/[^\s]+$/.test(v));
 export function installCommerce(app,db,{auth,csrf,admin,settings,loginLimit}) {
  const optionalCsrf=(req,res,next)=>req.session?csrf(req,res,next):next();
- const write=(fn)=>(req,res,next)=>{try{const r=fn(req,res);if(r?.catch)r.catch(next);}catch(e){if(e.code){console.error('Commerce operation failed',e.code);return fail(res,'Không thể lưu dữ liệu; kiểm tra giá trị trùng hoặc liên kết dữ liệu.',409);}fail(res,e,e.status||400);}};
+ const write=(fn)=>(req,res,next)=>{try{const r=fn(req,res);if(r?.catch)r.catch(next);}catch(e){if(e.status)return fail(res,e,e.status);if([1555,2067].includes(e.errcode))return fail(res,'Dữ liệu đã tồn tại.',409);if(e.code)return next(e);fail(res,e,400);}};
  const getOrder=(req)=>{const o=db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);const token=req.get('X-Order-Token');requireValue(o&&(req.session?.user_id===o.user_id||(token&&o.guest_hash===sha(token))),'Không tìm thấy đơn hoặc không có quyền truy cập.');return o;};
  const limited=rateLimit({windowMs:15*60000,limit:12,message:{error:'Vui lòng thử lại sau ít phút.'}});
  const config=()=>commerceSettings(db);
@@ -119,7 +120,7 @@ export function installCommerce(app,db,{auth,csrf,admin,settings,loginLimit}) {
   const result=transact(db,()=>{
    let created=0,updated=0;
    for(const row of rows){
-    requireValue(row&&Object.keys(row).every(k=>['id','name','category','description','price','stock','image','active','sku'].includes(k)),'CSV có cột không hỗ trợ.');
+    requireValue(row&&Object.keys(row).every(k=>['id','name','category','description','price','stock','image','active','sku','revision','stock_revision'].includes(k)),'CSV có cột không hỗ trợ.');
     const id=row.id?Number(row.id):null;requireValue(id===null||positive(id),'ID CSV phải là số nguyên dương hoặc để trống.');
     requireValue(['price','stock','active'].every(k=>row[k]!==undefined&&String(row[k]).trim()!==''),'CSV cần giá, tồn và trạng thái rõ ràng.');
     const old=id?db.prepare('SELECT * FROM products WHERE id=?').get(id):null;requireValue(!id||old,'ID sản phẩm không tồn tại.');
@@ -130,6 +131,8 @@ export function installCommerce(app,db,{auth,csrf,admin,settings,loginLimit}) {
     const details={...JSON.parse(old?.details||'{}'),...(Object.hasOwn(row,'sku')?{sku}:{})};
     let target=id;
     if(old){
+     assertRevision(csvRevision(row.revision),old.revision);
+     assertRevision(csvRevision(row.stock_revision),old.stock_revision);
      db.prepare('UPDATE products SET name=?,category=?,description=?,price=?,stock=?,image=?,active=?,details=? WHERE id=?').run(p.name.trim(),p.category,p.description||'',p.price,p.stock,p.image||'',p.active,JSON.stringify(details),id);
      if(p.stock!==old.stock)movement(db,id,null,p.stock-old.stock,'csv_import',null,req.session.user_id);
      updated++;
@@ -160,17 +163,41 @@ export function installCommerce(app,db,{auth,csrf,admin,settings,loginLimit}) {
  app.post('/api/admin/inventory',csrf,write((req,res)=>{const b=req.body;requireValue(positive(b.product_id)&&Number.isSafeInteger(b.delta)&&b.delta!==0&&Math.abs(b.delta)<=1e6&&text(b.reason,500)&&b.reason.trim().length>=3,'Nhập sản phẩm, lượng điều chỉnh và lý do.');transact(db,()=>{const p=b.variant_id?db.prepare('SELECT * FROM product_variants WHERE id=? AND product_id=?').get(b.variant_id,b.product_id):db.prepare('SELECT * FROM products WHERE id=?').get(b.product_id);requireValue(p&&p.stock+b.delta>=0,'Sản phẩm không tồn tại hoặc tồn kho không đủ.');requireValue(b.variant_id||!db.prepare('SELECT id FROM product_variants WHERE product_id=?').get(b.product_id),'Điều chỉnh tồn kho theo từng biến thể.');db.prepare(b.variant_id?'UPDATE product_variants SET stock=stock+? WHERE id=?':'UPDATE products SET stock=stock+? WHERE id=?').run(b.delta,p.id);movement(db,b.product_id,b.variant_id,b.delta,b.reason.trim(),null,req.session.user_id);recordAudit(req,'stock',b.product_id,b.reason.trim());});res.json({ok:true});}));
  app.get('/api/admin/products/:id/variants',(req,res)=>res.json(db.prepare('SELECT * FROM product_variants WHERE product_id=? ORDER BY id').all(req.params.id)));
  app.post('/api/admin/products/:id/variants',csrf,write((req,res)=>{const b=req.body;requireValue(text(b.sku,100)&&b.sku.trim()&&text(b.label,200)&&b.label.trim()&&moneyInt(b.price)&&moneyInt(b.stock,1e6),'Biến thể không hợp lệ.');const id=transact(db,()=>{requireValue(db.prepare('SELECT id FROM products WHERE id=?').get(req.params.id),'Không tìm thấy sản phẩm.');assertSkuAvailable(db,b.sku);const id=Number(db.prepare('INSERT INTO product_variants(product_id,sku,label,price,stock) VALUES(?,?,?,?,?)').run(req.params.id,normalizeSku(b.sku),b.label.trim(),b.price,b.stock).lastInsertRowid);movement(db,Number(req.params.id),id,b.stock,'variant_created',null,req.session.user_id);recordAudit(req,'variant_created',id);return id;});res.status(201).json({id});}));
- app.put('/api/admin/variants/:id',csrf,write((req,res)=>{const b=req.body;requireValue(text(b.label,200)&&b.label.trim()&&moneyInt(b.price)&&moneyInt(b.stock,1e6)&&[0,1].includes(b.active),'Biến thể không hợp lệ.');transact(db,()=>{const v=db.prepare('SELECT * FROM product_variants WHERE id=?').get(req.params.id);requireValue(v,'Không tìm thấy biến thể.');db.prepare('UPDATE product_variants SET label=?,price=?,stock=?,active=? WHERE id=?').run(b.label.trim(),b.price,b.stock,b.active,v.id);if(v.stock!==b.stock)movement(db,v.product_id,v.id,b.stock-v.stock,'variant_edit',null,req.session.user_id);recordAudit(req,'variant_updated',v.id,JSON.stringify({before:{price:v.price,stock:v.stock,active:v.active},after:{price:b.price,stock:b.stock,active:b.active}}));});res.json({ok:true});}));
+ const updateVariant=write((req,res)=>{
+  const b=req.body,patch=req.method==='PATCH';
+  requireValue(b&&typeof b==='object'&&!Array.isArray(b),'Biến thể không hợp lệ.');
+  if(patch)requireValue(Object.keys(b).every(key=>['revision','label','price','active'].includes(key)),'Điều chỉnh tồn kho ở mục Kho & biến thể.');
+  transact(db,()=>{
+   const v=db.prepare('SELECT * FROM product_variants WHERE id=?').get(req.params.id);
+   requireValue(v,'Không tìm thấy biến thể.',404);
+   assertRevision(b.revision,v.revision);if(!patch)assertRevision(b.stock_revision,v.stock_revision);
+   const updated=patch?{...v,...b}:b;
+   requireValue(text(updated.label,200)&&updated.label.trim()&&moneyInt(updated.price)&&moneyInt(updated.stock,1e6)&&[0,1].includes(updated.active),'Biến thể không hợp lệ.');
+   db.prepare('UPDATE product_variants SET label=?,price=?,stock=?,active=? WHERE id=?').run(updated.label.trim(),updated.price,updated.stock,updated.active,v.id);
+   if(v.stock!==updated.stock)movement(db,v.product_id,v.id,updated.stock-v.stock,'variant_edit',null,req.session.user_id);
+   recordAudit(req,'variant_updated',v.id,JSON.stringify({before:{price:v.price,stock:v.stock,active:v.active,label:v.label},after:{price:updated.price,stock:updated.stock,active:updated.active,label:updated.label.trim()}}));
+  });res.json({ok:true});
+ });
+ app.put('/api/admin/variants/:id',csrf,updateVariant);
+ app.patch('/api/admin/variants/:id',csrf,updateVariant);
  app.get('/api/admin/coupons',(req,res)=>res.json(db.prepare('SELECT * FROM coupons ORDER BY ends DESC').all().map(c=>({...c,product_ids:JSON.parse(c.product_ids)}))));
  app.put('/api/admin/coupons/:code',csrf,write((req,res)=>{const b=req.body,code=req.params.code.toUpperCase();requireValue(/^[A-Z0-9_-]{3,40}$/.test(code)&&['fixed','percent'].includes(b.kind)&&positive(b.value)&&(b.kind!=='percent'||b.value<=100)&&moneyInt(b.min_total)&&positive(b.max_discount)&&moneyInt(b.starts,1e15)&&moneyInt(b.ends,1e15)&&b.ends>b.starts&&positive(b.limit_total)&&positive(b.limit_user)&&Array.isArray(b.product_ids)&&b.product_ids.length<=200&&b.product_ids.every(positive)&&[0,1].includes(b.active),'Mã hoặc điều kiện giảm giá không hợp lệ.');transact(db,()=>{db.prepare('INSERT INTO coupons VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(code) DO UPDATE SET kind=excluded.kind,value=excluded.value,min_total=excluded.min_total,max_discount=excluded.max_discount,starts=excluded.starts,ends=excluded.ends,limit_total=excluded.limit_total,limit_user=excluded.limit_user,product_ids=excluded.product_ids,active=excluded.active').run(code,b.kind,b.value,b.min_total,b.max_discount,b.starts,b.ends,b.limit_total,b.limit_user,JSON.stringify(b.product_ids),b.active);recordAudit(req,'coupon',code);});res.json({ok:true});}));
  app.get('/api/admin/reviews',(req,res)=>res.json(db.prepare('SELECT r.*,p.name product,u.name customer FROM reviews r JOIN products p ON p.id=r.product_id JOIN users u ON u.id=r.user_id ORDER BY r.id DESC LIMIT 200').all()));
- app.patch('/api/admin/reviews/:id',csrf,write((req,res)=>{requireValue(['approved','rejected'].includes(req.body.status),'Trạng thái không hợp lệ.');db.prepare('UPDATE reviews SET status=? WHERE id=?').run(req.body.status,req.params.id);recordAudit(req,'review',req.params.id,req.body.status);res.json({ok:true});}));
- app.get('/api/admin/audit',owner,(req,res)=>res.json(db.prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT 300').all()));
+ app.patch('/api/admin/reviews/:id',csrf,write((req,res)=>{
+  requireValue(['approved','rejected'].includes(req.body.status),'Trạng thái không hợp lệ.');
+  transact(db,()=>{
+   const old=db.prepare('SELECT id,status FROM reviews WHERE id=?').get(req.params.id);
+   requireValue(old,'Không tìm thấy đánh giá.',404);
+   if(old.status===req.body.status)return;
+   db.prepare('UPDATE reviews SET status=? WHERE id=?').run(req.body.status,old.id);
+   recordAudit(req,'review',old.id,JSON.stringify({before:{status:old.status},after:{status:req.body.status}}));
+  });res.json({ok:true});
+ }));
  app.get('/api/admin/users',owner,(req,res)=>res.json(db.prepare("SELECT id,name,email,role,verified FROM users WHERE role!='guest' ORDER BY id DESC LIMIT 200").all()));
  app.patch('/api/admin/users/:id/role',owner,csrf,write((req,res)=>{requireValue(Object.hasOwn(roles, req.body.role),'Vai trò không hợp lệ.');requireValue(Number(req.params.id)!==req.session.user_id,'Không tự đổi quyền của mình.');transact(db,()=>{requireValue(db.prepare("SELECT id FROM users WHERE id=? AND role!='guest'").get(req.params.id),'Không tìm thấy người dùng.');db.prepare('UPDATE users SET role=? WHERE id=?').run(req.body.role,req.params.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id);recordAudit(req,'role',req.params.id,req.body.role);});res.json({ok:true});}));
  app.get('/api/admin/outbox',owner,(req,res)=>res.json(db.prepare('SELECT id,recipient,subject,status,attempts,created,sent FROM notification_outbox ORDER BY id DESC LIMIT 200').all()));
  app.post('/api/admin/outbox/:id/retry',owner,csrf,(req,res)=>{db.prepare("UPDATE notification_outbox SET status='queued' WHERE id=? AND status='failed'").run(req.params.id);res.json({ok:true});});
- app.get('/api/admin/export/:kind',write((req,res)=>{requireValue(['orders','products'].includes(req.params.kind),'Loại xuất không hợp lệ.');const rows=req.params.kind==='orders'?db.prepare('SELECT id,created,status,payment_status,total,shipping,discount,payment,recipient,phone,address,coupon FROM orders ORDER BY id DESC LIMIT 10000').all():db.prepare("SELECT id,name,category,description,price,stock,image,active,COALESCE(json_extract(details,'$.sku'),'') sku FROM products ORDER BY id").all();const keys=Object.keys(rows[0]||{id:0});const cell=v=>'"'+String(v??'').replace(/^[=+\-@\t\r]/,"'$&").replaceAll('"','""')+'"';res.type('text/csv').attachment(req.params.kind+'.csv').send('\ufeff'+[keys,...rows.map(r=>keys.map(k=>r[k]))].map(row=>row.map(cell).join(',')).join('\r\n'));}));
+ app.get('/api/admin/export/:kind',write((req,res)=>{requireValue(['orders','products'].includes(req.params.kind),'Loại xuất không hợp lệ.');const rows=req.params.kind==='orders'?db.prepare('SELECT id,created,status,payment_status,total,shipping,discount,payment,recipient,phone,address,coupon FROM orders ORDER BY id DESC LIMIT 10000').all():db.prepare("SELECT id,name,category,description,price,stock,image,active,COALESCE(json_extract(details,'$.sku'),'') sku,revision,stock_revision FROM products ORDER BY id").all();const keys=Object.keys(rows[0]||{id:0});const cell=v=>'"'+String(v??'').replace(/^[=+\-@\t\r]/,"'$&").replaceAll('"','""')+'"';res.type('text/csv').attachment(req.params.kind+'.csv').send('\ufeff'+[keys,...rows.map(r=>keys.map(k=>r[k]))].map(row=>row.map(cell).join(',')).join('\r\n'));}));
  const chatLimit=rateLimit({windowMs:3600000,limit:20,message:{error:'Đã đạt giới hạn 20 câu hỏi mỗi giờ. Liên hệ cửa hàng để được hỗ trợ.'}});
  app.post('/api/chat',auth,csrf,chatLimit,write(async(req,res)=>{requireValue(text(req.body.message,1000)&&req.body.message.trim().length>=2,'Nhập câu hỏi từ 2–1000 ký tự.');const message=req.body.message.trim(),terms=normalize(message).split(' ').filter(w=>w.length>2);const candidates=db.prepare('SELECT * FROM products WHERE active=1').all().map(p=>decorateProduct(db,p,readProduct)).map(p=>({...p,score:terms.filter(t=>normalize(p.name+' '+p.category+' '+p.description).includes(t)).length})).filter(p=>p.score>0).sort((a,b)=>b.score-a.score).slice(0,5);const s=settings();let answer='Bạn có thể xem các sản phẩm phù hợp bên dưới. Giá và tồn kho được lấy từ cửa hàng tại thời điểm hỏi.';if(!candidates.length)answer='Tôi chưa tìm thấy sản phẩm phù hợp. Bạn có thể mô tả loại sản phẩm, dung tích hoặc ngân sách; hoặc liên hệ cửa hàng: '+(s.phone||s.email||'thông tin ở chân trang')+'.';
  const dailyLimit=Math.max(1,Math.min(10000,Number(process.env.CHAT_DAILY_LIMIT)||200));requireValue(db.prepare('SELECT count(*) n FROM chat_sessions WHERE created>=?').get(new Date().toISOString().slice(0,10)).n<dailyLimit,'Trợ lý đã đạt ngân sách lượt chat hôm nay. Liên hệ cửa hàng để được hỗ trợ.',429);

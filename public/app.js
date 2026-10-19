@@ -194,12 +194,11 @@ function editorInput(name, title, value, multiline = false) {
 }
 
 function editProduct(product = { name: '', category: config.categories[0] || '', description: '', price: 0, stock: 0, image: '', active: 0 }) {
-  product = {...product,price:product.base_price??product.price,stock:product.base_stock??product.stock};
   product = { ...product, price: product.base_price ?? product.price, stock: product.base_stock ?? product.stock };
   const info = details(product);
   modal(`<h2>${product.id ? 'Sửa' : 'Thêm'} sản phẩm</h2><p class="muted">Nhập thông tin cơ bản trước. Mở các nhóm bên dưới khi cần bổ sung nội dung chi tiết.</p>${product.has_variants ? '<p class="notice">Sản phẩm có biến thể. Giá và tồn kho bên dưới là dữ liệu gốc; quản lý từng phiên bản ở mục Kho & biến thể.</p>' : ''}<form id="product-form" class="form">
     <section class="product-editor-section"><h3>Thông tin cơ bản</h3><label>Tên sản phẩm<input name="name" required maxlength="200" value="${esc(product.name)}"></label>
-    <div class="settings-grid"><label>Danh mục<select name="category">${[...new Set([...config.categories, product.category])].filter(Boolean).map(name => `<option ${name === product.category ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></label>${editorInput('detail_sku', 'Mã sản phẩm (SKU)', info.sku)}<label>Giá bán (đ)<input type="number" name="price" min="0" max="1000000000" step="1" required value="${product.price}"></label><label>Số lượng tồn kho<input type="number" name="stock" min="0" max="1000000" step="1" required value="${product.stock}"></label><label>Trạng thái<select name="active"><option value="1" ${product.active ? 'selected' : ''}>Đang bán — hiện trên cửa hàng</option><option value="0" ${!product.active ? 'selected' : ''}>Đang ẩn — lưu bản nháp</option></select></label><label>Dữ liệu mẫu<select name="detail_is_sample"><option value="1" ${info.is_sample ? 'selected' : ''}>Mẫu tham khảo</option><option value="0" ${!info.is_sample ? 'selected' : ''}>Sản phẩm chính thức</option></select></label></div></section>
+    <div class="settings-grid"><label>Danh mục<select name="category">${[...new Set([...config.categories, product.category])].filter(Boolean).map(name => `<option ${name === product.category ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></label>${editorInput('detail_sku', 'Mã sản phẩm (SKU)', info.sku)}<label>Giá bán (đ)<input type="number" name="price" min="0" max="1000000000" step="1" required value="${product.price}"></label>${product.id ? `<p>Tồn kho khi mở: ${product.stock}. <a href="#admin/inventory">Điều chỉnh ở Kho & biến thể</a>.</p>` : `<label>Số lượng tồn kho ban đầu<input type="number" name="stock" min="0" max="1000000" step="1" required value="${product.stock}"></label>`}<label>Trạng thái<select name="active"><option value="1" ${product.active ? 'selected' : ''}>Đang bán — hiện trên cửa hàng</option><option value="0" ${!product.active ? 'selected' : ''}>Đang ẩn — lưu bản nháp</option></select></label><label>Dữ liệu mẫu<select name="detail_is_sample"><option value="1" ${info.is_sample ? 'selected' : ''}>Mẫu tham khảo</option><option value="0" ${!info.is_sample ? 'selected' : ''}>Sản phẩm chính thức</option></select></label></div></section>
     <section class="product-editor-section"><h3>Ảnh sản phẩm</h3><img class="admin-image-preview" id="product-image-preview" src="${esc(product.image)}" alt="Ảnh chính" ${product.image ? '' : 'hidden'}><label>Tải ảnh chính lên<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="image"><small>PNG, JPG hoặc WebP, tối đa 5 MB. Nhấn Lưu sản phẩm sau khi tải.</small></label><label>Hoặc dùng đường dẫn ảnh<input name="image" value="${esc(product.image)}" placeholder="/uploads/anh.webp hoặc https://..."></label><details class="admin-section"><summary>Thêm ảnh trong thư viện</summary>${editorInput('detail_gallery', 'Mỗi dòng một đường dẫn ảnh', (info.gallery || []).join('\n'), true)}</details></section>
     <section class="product-editor-section"><h3>Nội dung giới thiệu</h3>${editorInput('detail_summary', 'Giới thiệu ngắn (trên thẻ sản phẩm)', info.summary, true)}<label>Mô tả chi tiết<textarea name="description" maxlength="10000">${esc(product.description)}</textarea></label></section>
     <details class="admin-section"><summary>Thông số & đặc điểm sản phẩm</summary><div class="settings-grid">${[['material', 'Chất liệu'], ['dimensions', 'Kích thước'], ['capacity', 'Dung tích'], ['color', 'Màu sắc']].map(([key, title]) => editorInput('detail_' + key, title, info[key])).join('')}</div>${editorInput('detail_badge', 'Nhãn nổi bật trên thẻ sản phẩm', info.badge)}${editorInput('detail_features', 'Đặc điểm nổi bật (mỗi dòng một mục)', (info.features || []).join('\n'), true)}${editorInput('detail_specifications', 'Thông số khác (mỗi dòng: tên thông số: giá trị)', (info.specifications || []).map(spec => spec.label + ': ' + spec.value).join('\n'), true)}${editorInput('detail_care', 'Hướng dẫn sử dụng & bảo quản', info.care, true)}</details>
@@ -215,14 +214,20 @@ function editProduct(product = { name: '', category: config.categories[0] || '',
     submit(form, async () => {
       const data = Object.fromEntries(new FormData(form));
       const body = Object.fromEntries(['name', 'category', 'description', 'image'].map(key => [key, data[key]]));
-      for (const key of ['price', 'stock', 'active']) body[key] = Number(data[key]);
+      for (const key of ['price', 'active', ...(product.id ? [] : ['stock'])]) body[key] = Number(data[key]);
       body.details = {};
       for (const key of ['sku', 'summary', 'material', 'dimensions', 'capacity', 'color', 'badge', 'care']) body.details[key] = data['detail_' + key].trim();
       body.details.features = lines(data.detail_features);
       body.details.gallery = lines(data.detail_gallery);
       body.details.specifications = lines(data.detail_specifications).map(line => { const index = line.indexOf(':'); if (index < 1 || !line.slice(index + 1).trim()) throw Error('Mỗi thông số cần có dạng “Tên: giá trị”.'); return { label: line.slice(0, index).trim(), value: line.slice(index + 1).trim() }; });
       body.details.is_sample = data.detail_is_sample === '1';
-      await api('/admin/products' + (product.id ? '/' + product.id : ''), { method: product.id ? 'PUT' : 'POST', body });
+      if (product.id) {
+        body.details = Object.fromEntries(Object.entries(body.details).filter(([key,value]) => JSON.stringify(value) !== JSON.stringify(info[key])));
+        if (!Object.keys(body.details).length) delete body.details;
+        for (const key of ['name','category','description','image','price','active']) if (body[key] === product[key]) delete body[key];
+        body.revision = product.revision;
+      }
+      await api('/admin/products' + (product.id ? '/' + product.id : ''), { method: product.id ? 'PATCH' : 'POST', body });
       await motion.closeDialog($('#modal'));
       await refresh();
       toast('Đã lưu sản phẩm');

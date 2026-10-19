@@ -1,3 +1,4 @@
+import { appendAudit } from './audit-log.js';
 export const roles = {
   admin: { label: 'Quản trị viên', description: 'Toàn quyền, gồm tài khoản, thanh toán và nhật ký.', permissions: ['dashboard.read', 'products.manage', 'orders.manage', 'content.manage', 'settings.manage', 'users.manage', 'audit.read', 'marketing.manage', 'outbox.manage'] },
   manager: { label: 'Quản lý cửa hàng', description: 'Quản lý sản phẩm, danh mục và xử lý đơn hàng.', permissions: ['dashboard.read', 'products.manage', 'orders.manage', 'marketing.manage'] },
@@ -9,7 +10,7 @@ export const roles = {
 export const permissionsFor = role => [...(roles[role]?.permissions || [])];
 export const publicUser = user => ({ id: user.id ?? user.user_id, name: user.name, email: user.email, role: user.role, permissions: permissionsFor(user.role) });
 export function audit(db, actorId, action, entity, entityId, details = {}) {
-  db.prepare('INSERT INTO audit_log(actor,action,target,note,created) VALUES(?,?,?,?,?)').run(actorId, action, String(entityId), JSON.stringify({ entity, entity_id: String(entityId), details }), new Date().toISOString());
+  appendAudit(db, actorId, action, entity, entityId, details);
 }
 export function transaction(db, fn) {
   db.exec('BEGIN IMMEDIATE');

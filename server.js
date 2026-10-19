@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { assertRevision } from './concurrency.js';
 import { assertSkuAvailable, normalizeSku, productVariants } from './catalog.js';
 import { installTranslations } from './translations.js';
 import { installCommerce } from './commerce-api.js';
@@ -13,7 +14,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { openStore, hashPassword, checkPassword, readProduct, defaultEditorial } from './store.js';
 import { navigationValid } from './navigation.js';
-import { permissionsFor, publicUser, adminGate, transaction } from './access.js';
+import { permissionsFor, publicUser, adminGate } from './access.js';
 import { installAdminApi } from './admin-api.js';
 const str=(v,max=500)=>typeof v==='string'&&v.length<=max;
 const integer=(v,max=1e9)=>Number.isSafeInteger(v)&&v>=0&&v<=max;
@@ -102,9 +103,10 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
  const uploadDir=path.resolve(path.dirname(db.location('main')||path.resolve(process.env.DATA_DIR||'./data','store.sqlite')),'uploads');mkdirSync(uploadDir,{recursive:true,mode:0o700});
  app.post('/api/admin/upload',csrf,express.raw({type:'application/octet-stream',limit:'5mb'}),async(req,res)=>{const b=req.body;if(!Buffer.isBuffer(b)||b.length<12)return fail(res,'Tệp ảnh không hợp lệ.');try{const metadata=await sharp(b,{limitInputPixels:25000000}).metadata();if(!['png','jpeg','webp'].includes(metadata.format))return fail(res,'Chỉ nhận PNG, JPEG hoặc WebP.');const converted=await sharp(b,{limitInputPixels:25000000,animated:false}).rotate().resize({width:2400,height:2400,fit:'inside',withoutEnlargement:true}).webp({quality:85}).toBuffer();const name=randomBytes(20).toString('hex')+'.webp';writeFileSync(path.join(uploadDir,name),converted,{mode:0o600});audit(db,req.session.user_id,'image_upload',name);res.status(201).json({url:'/uploads/'+name});}catch{return fail(res,'Không giải mã được ảnh. Chỉ dùng PNG/JPEG/WebP hợp lệ, tối đa 5 MB và 25 triệu điểm ảnh.');}});
  app.get('/api/admin/products',permit('products.manage'),(req,res)=>res.json(db.prepare('SELECT * FROM products ORDER BY id DESC').all().map(p=>({...decorateProduct(db,p,readProduct),base_price:p.price,base_stock:p.stock,all_variants:productVariants(db,p.id)}))));
+ const validProduct=p=>record(p)&&str(p.name,200)&&p.name.trim()&&str(p.category,100)&&settings().categories.includes(p.category)&&str(p.description,10000)&&integer(p.price,1e9)&&integer(p.stock,1e6)&&safeImage(p.image)&&[0,1].includes(p.active)&&(p.details===undefined||productDetailsValid(p.details));
  function product(req,res,next){
   const p=req.body;
-  if(!record(p)||!str(p.name,200)||!p.name.trim()||!str(p.category,100)||!settings().categories.includes(p.category)||!str(p.description,10000)||!integer(p.price,1e9)||!integer(p.stock,1e6)||!safeImage(p.image)||![0,1].includes(p.active)||(p.details!==undefined&&!productDetailsValid(p.details)))return fail(res,'Thông tin sản phẩm không hợp lệ.');
+  if(!validProduct(p))return fail(res,'Thông tin sản phẩm không hợp lệ.');
   if(p.details && Object.hasOwn(p.details,'sku'))p.details={...p.details,sku:normalizeSku(p.details.sku)};
   next();
  }
@@ -122,18 +124,26 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
   });
   res.status(201).json({id});
  }));
- app.put('/api/admin/products/:id',csrf,permit('products.manage'),product,catalogWrite((req,res)=>{
-  const p=req.body;
+ const updateProduct=catalogWrite((req,res)=>{
+  const patch=req.method==='PATCH',body=req.body;
+  if(patch&&(!record(body)||Object.keys(body).some(key=>!['revision','name','category','description','price','image','active','details'].includes(key))))return fail(res,'Chỉ sửa thông tin sản phẩm; điều chỉnh số lượng tại mục Kho & biến thể.');
   transact(db,()=>{
    const previous=db.prepare('SELECT * FROM products WHERE id=?').get(req.params.id);
    if(!previous)throw Object.assign(Error('Không tìm thấy sản phẩm.'),{status:404});
+   assertRevision(body.revision,previous.revision);
+   if(!patch)assertRevision(body.stock_revision,previous.stock_revision);
+   const p=patch?{...previous,...body,details:body.details===undefined?JSON.parse(previous.details):{...JSON.parse(previous.details),...body.details}}:body;
+   if(!validProduct(p)||(body.details!==undefined&&!productDetailsValid(body.details)))throw Object.assign(Error('Thông tin sản phẩm không hợp lệ.'),{status:400});
+   if(p.details&&Object.hasOwn(p.details,'sku'))p.details={...p.details,sku:normalizeSku(p.details.sku)};
    assertSkuAvailable(db,p.details?.sku,{productId:previous.id});
    db.prepare('UPDATE products SET name=?,category=?,description=?,price=?,stock=?,image=?,active=?,details=COALESCE(?,details) WHERE id=?').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,p.details===undefined?null:JSON.stringify(p.details),previous.id);
    if(previous.stock!==p.stock)movement(db,previous.id,null,p.stock-previous.stock,'admin_edit',null,req.session.user_id);
    audit(db,req.session.user_id,'product_update',previous.id,JSON.stringify({before:{price:previous.price,stock:previous.stock,active:previous.active,sku:normalizeSku(JSON.parse(previous.details).sku)},after:{price:p.price,stock:p.stock,active:p.active,sku:p.details===undefined?normalizeSku(JSON.parse(previous.details).sku):p.details.sku||''}}));
   });
   res.json({ok:true});
- }));
+ });
+ app.put('/api/admin/products/:id',csrf,permit('products.manage'),product,updateProduct);
+ app.patch('/api/admin/products/:id',csrf,permit('products.manage'),updateProduct);
  app.delete('/api/admin/products/:id',csrf,permit('products.manage'),catalogWrite((req,res)=>{
   transact(db,()=>{
    db.prepare('UPDATE products SET active=0 WHERE id=?').run(req.params.id);
@@ -142,7 +152,6 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
   res.json({ok:true});
  }));
  app.get('/api/admin/settings',permit('content.manage','settings.manage'),(req,res)=>res.json(settings()));
- app.put('/api/admin/settings',csrf,permit('settings.manage'),(req,res)=>{const error=validateSettings(req.body,settings());if(error)return fail(res,error);transaction(db,()=>{db.prepare('UPDATE settings SET value=?,revision=revision+1 WHERE id=1').run(JSON.stringify(req.body));audit(db,req.session.user_id,'settings.update','settings','all');});res.json({ok:true});});
  app.use('/api',(req,res)=>fail(res,'Không tìm thấy API.',404));
  app.use('/uploads',express.static(uploadDir,{dotfiles:'deny',setHeaders:res=>res.set('Content-Security-Policy',"default-src 'none'; sandbox")}));
  installSeo(app,db,settings);

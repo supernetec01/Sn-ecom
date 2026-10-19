@@ -89,7 +89,7 @@ test('Admin can edit navigation content and order; unauthorized or invalid updat
   });
   assert.equal((await request('/admin/settings', { method: 'PUT', body: settings, cookie: customer.cookie, csrf: customer.data.csrf })).status, 403);
   assert.equal((await request('/admin/settings', { method: 'PUT', body: settings, cookie: login.cookie })).status, 403);
-  assert.equal((await request('/admin/settings', { ...auth, method: 'PUT', body: settings })).status, 200);
+  assert.equal((await request('/admin/settings', { ...auth, method: 'PUT', body: { ...settings, revision: (await request('/admin/config', auth)).data.revision } })).status, 200);
   const saved = (await request('/settings')).data;
   assert.deepEqual(saved.navigation, settings.navigation);
   assert.deepEqual(saved.labels, labels);
@@ -118,7 +118,7 @@ test('Admin can edit navigation content and order; unauthorized or invalid updat
    invalidNavigation.push(navigation);
   }
   for (const navigation of invalidNavigation) {
-   assert.equal((await request('/admin/settings', { ...auth, method: 'PUT', body: { ...settings, navigation } })).status, 400);
+   assert.equal((await request('/admin/settings', { ...auth, method: 'PUT', body: { ...settings, navigation, revision: (await request('/admin/config', auth)).data.revision } })).status, 400);
   }
   assert.deepEqual((await request('/admin/settings', auth)).data, saved);
  } finally { await close(); }

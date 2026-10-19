@@ -1,5 +1,6 @@
 import { createHash, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import { productVariants, normalizeSku } from './catalog.js';
+import { appendAudit } from './audit-log.js';
 export const sha = value => createHash('sha256').update(value).digest('hex');
 export const now = () => new Date().toISOString();
 export const moneyInt = (v,max=1e9) => Number.isSafeInteger(v)&&v>=0&&v<=max;
@@ -42,13 +43,32 @@ export function migrateCommerce(db) {
  CREATE INDEX IF NOT EXISTS idx_outbox_status ON notification_outbox(status,id);
  `);
  for(const table of ['orders','addresses'])for(const name of ['country','province_code','province_name','ward_code','ward_name','address_line','address_version'])add(table,name,"TEXT NOT NULL DEFAULT ''");
+ // Database triggers cover every writer, including checkout, release, CSV,
+ // category renames and legacy endpoints. Revisions also detect stock ABA.
+ for (const [table, fields] of [['products', ['name','category','description','price','image','active','details']], ['product_variants', ['sku','label','price','active']]]) {
+  add(table, 'revision', 'INTEGER NOT NULL DEFAULT 0');
+  add(table, 'stock_revision', 'INTEGER NOT NULL DEFAULT 0');
+  db.exec(`CREATE TRIGGER IF NOT EXISTS ${table}_content_revision AFTER UPDATE OF ${fields.join(',')} ON ${table}
+   WHEN ${fields.map(field => `OLD.${field} IS NOT NEW.${field}`).join(' OR ')}
+   BEGIN UPDATE ${table} SET revision=revision+1 WHERE id=NEW.id; END;
+   CREATE TRIGGER IF NOT EXISTS ${table}_stock_revision AFTER UPDATE OF stock ON ${table}
+   WHEN OLD.stock IS NOT NEW.stock
+   BEGIN UPDATE ${table} SET stock_revision=stock_revision+1 WHERE id=NEW.id; END;`);
+ }
  db.prepare('INSERT OR IGNORE INTO commerce_settings VALUES(1,?)').run(JSON.stringify({holdHours:24,rewardsEnabled:false,pointsPer:10000,pointValue:1000,shippingRules:[]}));
  db.exec('COMMIT');
  }catch(e){db.exec('ROLLBACK');throw e;}
 }
 export const commerceSettings = db => JSON.parse(db.prepare('SELECT value FROM commerce_settings WHERE id=1').get().value);
 export function transact(db,fn){db.exec('BEGIN IMMEDIATE');try{const r=fn();db.exec('COMMIT');return r;}catch(e){db.exec('ROLLBACK');throw e;}}
-export function audit(db,actor,action,target,note=''){db.prepare('INSERT INTO audit_log(actor,action,target,note,created) VALUES(?,?,?,?,?)').run(actor??null,action,String(target),note,now());}
+export function audit(db,actor,action,target,note=''){
+ let details;try{const parsed=typeof note==='string'?JSON.parse(note):note;if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))details=parsed;}catch{}
+ // Retain legacy free-text notes (stock reasons, payment references, etc.) in
+ // storage. The API exposes only whitelisted structured fields.
+ if(!details){db.prepare('INSERT INTO audit_log(actor,action,target,note,created) VALUES(?,?,?,?,?)').run(actor??null,action,String(target),typeof note==='string'?note:'',now());return;}
+ const entity=/^(product[._]|csv_import)/.test(action)||action==='stock'?'product':/^variant_/.test(action)?'variant':action==='review'?'review':'Dữ liệu';
+ appendAudit(db,actor,action,entity,target,details);
+}
 export function event(db,id,actor,kind,note){db.prepare('INSERT INTO order_events(order_id,actor,kind,note,created) VALUES(?,?,?,?,?)').run(id,actor??null,kind,note,now());}
 export function queueEmail(db,to,subject,body){if(emailValid(to)&&!to.endsWith('@guest.invalid'))db.prepare('INSERT INTO notification_outbox(recipient,subject,body,created) VALUES(?,?,?,?)').run(to,subject,body,now());}
 export function notifyOrder(db,o,note){queueEmail(db,o.email||db.prepare('SELECT email FROM users WHERE id=?').get(o.user_id)?.email,`Đơn SN${o.id}: ${note}`,`${note}\nMã đơn: SN${o.id}\nTổng tiền: ${o.total} VND.\nVui lòng liên hệ cửa hàng nếu cần hỗ trợ.`);}

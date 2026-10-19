@@ -1,5 +1,7 @@
 import { roles, publicUser, audit, transaction } from './access.js';
 import { hashPassword } from './store.js';
+import { assertRevision } from './concurrency.js';
+import { auditView } from './audit-log.js';
 
 const text = (value, max = 200) => typeof value === 'string' && value.length <= max;
 const emailValid = value => text(value, 254) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -17,11 +19,11 @@ export const configSections = {
 export function installAdminApi(app, { db, auth, csrf, permit, settings, validateSettings, passwordLimit }) {
   const fail = (res, error, status = 400) => res.status(status).json({ error });
   const reject = (message, status = 400) => { const error = new Error(message); error.httpStatus = status; throw error; };
-  const safely = handler => (req, res, next) => { try { if (req.method !== 'GET' && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body))) return fail(res, 'Dữ liệu gửi lên không hợp lệ.'); handler(req, res); } catch (error) { if (error.httpStatus) return fail(res, error.message, error.httpStatus); if (error.code?.includes('CONSTRAINT') || (error.errcode & 255) === 19) return fail(res, 'Email đã được sử dụng hoặc dữ liệu không hợp lệ.'); next(error); } };
+  const safely = handler => (req, res, next) => { try { if (req.method !== 'GET' && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body))) return fail(res, 'Dữ liệu gửi lên không hợp lệ.'); handler(req, res); } catch (error) { if (error.httpStatus) return fail(res, error.message, error.httpStatus); if ([1555, 2067].includes(error.errcode)) return fail(res, 'Email đã được sử dụng hoặc dữ liệu không hợp lệ.'); next(error); } };
   const configAccess = permit('content.manage', 'settings.manage');
   const saveConfig = (req, mutate, action, id) => transaction(db, () => {
     const row = db.prepare('SELECT value,revision FROM settings WHERE id=1').get();
-    if (req.body.revision !== undefined && req.body.revision !== row.revision) reject('Dữ liệu đã được người khác cập nhật. Hãy tải lại mục này trước khi lưu.', 409);
+    assertRevision(req.body.revision, row.revision);
     const old = JSON.parse(row.value), updated = mutate(structuredClone(old));
     const error = validateSettings(updated, old); if (error) reject(error);
     db.prepare('UPDATE settings SET value=?,revision=revision+1 WHERE id=1').run(JSON.stringify(updated));
@@ -49,6 +51,11 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
     const permission = section === 'sales' ? 'settings.manage' : 'content.manage';
     if (!req.session.permissions.includes(permission)) return fail(res, 'Bạn không có quyền thay đổi mục này.', 403);
     res.json(saveConfig(req, old => ({ ...old, ...values }), 'settings.update', section));
+  }));
+  // The legacy full save shares validation, revision checking and atomic audit.
+  app.put('/api/admin/settings', csrf, permit('settings.manage'), safely((req, res) => {
+    const values = { ...req.body }; delete values.revision;
+    res.json(saveConfig(req, () => values, 'settings.update', 'all'));
   }));
 
   app.get('/api/admin/categories', permit('products.manage'), (req, res) => res.json({ items: settings().categories.map(name => ({ name, ...db.prepare('SELECT COUNT(*) AS total,COALESCE(SUM(active),0) AS visible FROM products WHERE category=?').get(name) })), revision: db.prepare('SELECT revision FROM settings WHERE id=1').get().revision }));
@@ -134,8 +141,5 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
       audit(db, req.session.user_id, 'user.password_reset', 'user', id);
     }); res.json({ ok: true });
   }));
-  app.get('/api/admin/audit', permit('audit.read'), (req, res) => res.json(db.prepare('SELECT a.*,u.name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 100').all().map(row => {
-    let data = {}; try { const parsed = JSON.parse(row.note); if (parsed && typeof parsed === 'object') data = parsed; } catch {}
-    return { id: row.id, action: row.action, actor: row.actor_name, created: row.created, entity: data.entity || 'Dữ liệu', entity_id: data.entity_id || row.target, details: data.details || {} };
-  })));
+  app.get('/api/admin/audit', permit('audit.read'), (req, res) => res.json(db.prepare('SELECT a.*,u.name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 100').all().map(auditView)));
 }
