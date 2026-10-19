@@ -1,4 +1,5 @@
 import { migrateCommerce } from './commerce-store.js';
+import { migrateTranslations } from './translations.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -135,5 +136,6 @@ export function openStore(dir=process.env.DATA_DIR || './data') {
  if(changed)db.prepare('UPDATE settings SET value=? WHERE id=1').run(JSON.stringify(existing));
  if(initialized.changes && db.prepare('SELECT COUNT(*) AS count FROM products').get().count===0) seedDemoCatalog(db);
  migrateCommerce(db);
+ migrateTranslations(db);
  return db;
 }

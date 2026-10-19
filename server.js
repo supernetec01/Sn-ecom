@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { installTranslations } from './translations.js';
 import { installCommerce } from './commerce-api.js';
 import { decorateProduct, verifyTotp, movement, audit, transact, expireOrders, useMfa } from './commerce-store.js';
 import { installSeo } from './seo.js';
@@ -37,7 +38,7 @@ const editorialValid = value => {
  return Array.isArray(value.journal.articles) && value.journal.articles.length <= 12 && value.journal.articles.every(item => exactKeys(item, ['title', 'excerpt', 'image', 'body']) && str(item.title, 300) && str(item.excerpt, 1000) && str(item.body, 10000) && safeImage(item.image));
 };
 const digest=v=>createHash('sha256').update(v).digest('hex');
-export function createApp(db=openStore()) {
+export function createApp(db=openStore(), { translation = {} } = {}) {
  const app=express(); app.disable('x-powered-by');
  app.use(helmet({contentSecurityPolicy:{directives:{'img-src':["'self'",'https:'],'script-src':["'self'"],'style-src':["'self'","'unsafe-inline'"],'upgrade-insecure-requests':process.env.NODE_ENV==='production'?[]:null}}}));
  app.use(express.json({limit:'128kb'}));
@@ -60,6 +61,7 @@ export function createApp(db=openStore()) {
  const admin=(req,res,next)=>{const role=req.session?.role,route=req.originalUrl.split('?')[0];const scopes={sales:/^\/api\/admin\/(overview|analytics|order-list|orders|returns|export\/orders|expire-orders)(\/|$)/,inventory:/^\/api\/admin\/(inventory|products|variants|export\/products)(\/|$)/,editor:/^\/api\/admin\/(products|settings|upload|reviews|coupons)(\/|$)/};return role==='admin'||scopes[role]?.test(route)?next():fail(res,'Không có quyền quản trị.',403);};
  const session=(res,user)=>{const token=randomBytes(32).toString('hex'),csrf=randomBytes(24).toString('hex');db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(digest(token),user.id,csrf,Date.now()+86400000*7);res.cookie('sn_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',maxAge:86400000*7,path:'/'});return {user:{id:user.id,name:user.name,email:user.email,role:user.role},csrf};};
  const loginLimit=rateLimit({windowMs:900000,limit:20,standardHeaders:'draft-8',legacyHeaders:false,message:{error:'Thử lại sau ít phút.'}});
+ installTranslations(app,db,translation);
  installCommerce(app,db,{auth,csrf,admin,settings,loginLimit});
  app.get('/api/settings',(req,res)=>res.json(settings()));
  app.get('/api/products',(req,res)=>res.json(db.prepare('SELECT * FROM products WHERE active=1 ORDER BY id DESC').all().map(p=>decorateProduct(db,p,readProduct))));

@@ -1,5 +1,7 @@
 # Super Net — storefront & administration
 
+Website có bộ chọn **Tiếng Việt / English / 繁體中文**. Nhãn giao diện dùng bản dịch đi kèm; nội dung công khai có thể dịch bằng Google Cloud Translation qua backend với cache và hạn mức. Xem [cấu hình ngôn ngữ và PowerShell](docs/languages.md).
+
 Ứng dụng thương mại điện tử bằng Node.js 24, Express và SQLite. Đây là bản phát triển chạy được, **chưa phải bản đã kiểm toán hoặc sẵn sàng mở bán công khai**.
 
 ## Chạy ứng dụng

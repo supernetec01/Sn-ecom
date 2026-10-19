@@ -16,6 +16,7 @@
     "backup": "node scripts/backup.js",
     "maintenance": "node scripts/maintenance.js",
     "test:browser": "node scripts/browser-smoke.cjs",
+    "test:languages": "node scripts/language-smoke.cjs",
     "addresses:update": "node --use-env-proxy scripts/update-vietnam-addresses.js"
   },
   "dependencies": {
