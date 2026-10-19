@@ -1,4 +1,5 @@
 import { motion } from './motion.js';
+import { createAdminUI } from './admin.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const money = value => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -22,7 +23,7 @@ const icons = {
   phone: '<path d="m7 3 3 5-3 3a15 15 0 0 0 6 6l3-3 5 3c0 3-2 5-5 4A20 20 0 0 1 3 8C2 5 4 3 7 3Z"/>',
 };
 const icon = (name, className = '') => `<svg class="icon ${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.arrow}</svg>`;
-let config, products, me = { user: null }, category = '', query = '', sort = 'newest', priceRange = '', adminTab = 'products';
+let config, products, me = { user: null }, category = '', query = '', sort = 'newest', priceRange = '';
 let cart;
 try { cart = JSON.parse(localStorage.getItem('sn-cart') || '[]'); if (!Array.isArray(cart)) cart = []; } catch { cart = []; }
 cart = cart.filter(item => Number.isSafeInteger(item.id) && Number.isSafeInteger(item.quantity) && item.quantity > 0 && item.quantity <= 99);
@@ -30,6 +31,7 @@ const label = key => esc(config.labels[key] || key);
 const ui = text => esc(config.ui?.[text] ?? text);
 const statusNames = { pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', shipped: 'Đang giao', completed: 'Hoàn tất', cancelled: 'Đã hủy' };
 const lines = text => String(text || '').split('\n').map(item => item.trim()).filter(Boolean);
+function isStaff() { return Boolean(me.user?.permissions?.length); }
 function details(product) { return product.details && typeof product.details === 'object' ? product.details : {}; }
 function editorial() {
   const source = config.editorial || {};
@@ -57,7 +59,12 @@ function closeCategories(restoreFocus = false) {
 async function api(url, options = {}) {
   const response = await fetch('/api' + url, { ...options, headers: { 'Content-Type': 'application/json', ...(me.csrf ? { 'X-CSRF-Token': me.csrf } : {}), ...options.headers }, body: options.body ? JSON.stringify(options.body) : undefined });
   const data = await response.json();
-  if (!response.ok) throw Error(data.error || 'Không thể xử lý yêu cầu.');
+  if (!response.ok) {
+    if (response.status === 401 && url.startsWith('/admin')) {
+      me = { user: null }; motion.closeDialog($('#modal')); location.hash = 'account';
+    }
+    throw Error(data.error || 'Không thể xử lý yêu cầu.');
+  }
   return data;
 }
 function toast(message) { motion.showToast($('#toast'), message); }
@@ -97,7 +104,7 @@ function header() {
       <a class="brand-link" href="#" aria-label="${esc(config.brand)}"><img class="logo" src="${esc(config.logo)}" alt="${esc(config.brand)}"></a>
       <form class="search" id="search">${icon('search')}<input aria-label="Tìm sản phẩm" name="q" placeholder="${esc(config.searchPlaceholder)}" value="${esc(query)}"><button aria-label="Tìm kiếm">${icon('arrow')}</button></form>
       <div class="header-actions"><a href="#account">${icon('user')}<span>${me.user ? esc(me.user.name) : label('account')}</span></a><a class="cart-link" href="#cart">${icon('bag')}<span>${label('cart')}</span><b class="cart-count">${count}</b></a></div>
-    </div><div class="nav-shell"><div class="wrap nav-frame"><div class="category-menu"><button class="category-toggle ${route === 'products' ? 'active' : ''}" id="category-toggle" aria-expanded="false" aria-controls="category-panel">${icon('menu')}<span>${esc(navigation().categoryLabel)}</span>${icon('down')}</button><div class="category-panel" id="category-panel" hidden><a class="${route === 'products' && !category ? 'active' : ''}" href="#products" data-category="">${esc(navigation().allLabel)}${icon('arrow')}</a>${config.categories.map(name => `<a class="${route === 'products' && category === name ? 'active' : ''}" href="#products" data-category="${esc(name)}">${esc(name)}${icon('chevron')}</a>`).join('')}</div></div><nav class="nav nav-tabs" aria-label="Điều hướng chính">${navigation().items.filter(item => item.enabled).map(item => `<a class="${'#' + route === navigationHref(item) ? 'active' : ''} ${item.id === 'rewards' ? 'rewards-link' : ''}" href="${navigationHref(item)}" ${'#' + route === navigationHref(item) ? 'aria-current="page"' : ''}>${item.id === 'rewards' ? esc(item.label).replace(/Rewards$/i, word => `<span class="rewards-word">${word}</span>`) : esc(item.label)}</a>`).join('')}${me.user?.role === 'admin' ? `<a class="admin-link" href="#admin">${label('admin')}</a>` : ''}</nav></div></div></header>`;
+    </div><div class="nav-shell"><div class="wrap nav-frame"><div class="category-menu"><button class="category-toggle ${route === 'products' ? 'active' : ''}" id="category-toggle" aria-expanded="false" aria-controls="category-panel">${icon('menu')}<span>${esc(navigation().categoryLabel)}</span>${icon('down')}</button><div class="category-panel" id="category-panel" hidden><a class="${route === 'products' && !category ? 'active' : ''}" href="#products" data-category="">${esc(navigation().allLabel)}${icon('arrow')}</a>${config.categories.map(name => `<a class="${route === 'products' && category === name ? 'active' : ''}" href="#products" data-category="${esc(name)}">${esc(name)}${icon('chevron')}</a>`).join('')}</div></div><nav class="nav nav-tabs" aria-label="Điều hướng chính">${navigation().items.filter(item => item.enabled).map(item => `<a class="${'#' + route === navigationHref(item) ? 'active' : ''} ${item.id === 'rewards' ? 'rewards-link' : ''}" href="${navigationHref(item)}" ${'#' + route === navigationHref(item) ? 'aria-current="page"' : ''}>${item.id === 'rewards' ? esc(item.label).replace(/Rewards$/i, word => `<span class="rewards-word">${word}</span>`) : esc(item.label)}</a>`).join('')}${isStaff() ? `<a class="admin-link" href="#admin">${label('admin')}</a>` : ''}</nav></div></div></header>`;
 }
 function footer() {
   const content = editorial();
@@ -174,45 +181,25 @@ function orderCard(order, admin = false) {
 async function accountPage() {
   if (!me.user) return authPage();
   const orders = await api('/orders');
-  return `<main class="wrap page"><div class="account-heading"><div><span class="eyebrow">${ui('TÀI KHOẢN CỦA BẠN')}</span><h1>${esc(me.user.name)}</h1><p class="muted">${esc(me.user.email)}</p></div><div class="button-row">${me.user.role === 'admin' ? `<a href="#admin" class="primary">${label('admin')} ${icon('arrow')}</a>` : ''}<button class="secondary" id="logout">${label('logout')}</button></div></div><h2>${label('orders')}</h2>${orders.length ? orders.map(order => orderCard(order)).join('') : `<div class="empty">${icon('bag')}<p>${ui('Chưa có đơn hàng.')}</p><a class="primary" href="#products">${label('products')}</a></div>`}</main>`;
+  return `<main class="wrap page"><div class="account-heading"><div><span class="eyebrow">${ui('TÀI KHOẢN CỦA BẠN')}</span><h1>${esc(me.user.name)}</h1><p class="muted">${esc(me.user.email)}</p></div><div class="button-row">${isStaff() ? `<a href="#admin" class="primary">${label('admin')} ${icon('arrow')}</a>` : ''}<button class="secondary" data-own-password>Đổi mật khẩu</button><button class="secondary" id="logout">${label('logout')}</button></div></div><h2>${label('orders')}</h2>${orders.length ? orders.map(order => orderCard(order)).join('') : `<div class="empty">${icon('bag')}<p>${ui('Chưa có đơn hàng.')}</p><a class="primary" href="#products">${label('products')}</a></div>`}</main>`;
 }
-const settingNames = { brand: 'Tên thương hiệu', tagline: 'Khẩu hiệu', announcement: 'Thanh thông báo', heroEyebrow: 'Dòng giới thiệu banner', heroTitle: 'Tiêu đề banner', heroText: 'Nội dung banner', heroButton: 'Nút banner', collectionTitle: 'Tiêu đề danh mục', collectionText: 'Mô tả danh mục', productsTitle: 'Tiêu đề sản phẩm', searchPlaceholder: 'Gợi ý ô tìm kiếm', logo: 'Đường dẫn logo', heroImage: 'Ảnh banner', shippingFee: 'Phí giao hàng (đ)', freeShipping: 'Ngưỡng miễn phí giao hàng (đ)', bankName: 'Tên ngân hàng', bankAccount: 'Số tài khoản', bankHolder: 'Chủ tài khoản', phone: 'Điện thoại', email: 'Email liên hệ', address: 'Địa chỉ', footerText: 'Giới thiệu ngắn ở chân trang' };
 function editorInput(name, title, value, multiline = false) {
   return `<label>${esc(title)}${multiline ? `<textarea name="${esc(name)}">${esc(value)}</textarea>` : `<input name="${esc(name)}" value="${esc(value)}">`}</label>`;
 }
-function categoryEditor(item = {}) {
-  return `<fieldset class="editor-card" data-category-entry><legend>Ảnh danh mục</legend>${editorInput('ed_category', 'Tên danh mục (trùng với danh mục cửa hàng)', item.category)}${editorInput('ed_category_image', 'Đường dẫn ảnh', item.image)}${editorInput('ed_category_caption', 'Dòng giới thiệu', item.caption)}<button type="button" class="danger" data-remove-entry>Xóa mục này</button></fieldset>`;
-}
-function articleEditor(article = {}) {
-  return `<fieldset class="editor-card" data-article-entry><legend>Bài viết cảm hứng</legend>${editorInput('ed_article_title', 'Tiêu đề', article.title)}${editorInput('ed_article_image', 'Đường dẫn ảnh', article.image)}${editorInput('ed_article_excerpt', 'Mô tả ngắn', article.excerpt, true)}${editorInput('ed_article_body', 'Nội dung bài viết', article.body, true)}<button type="button" class="danger" data-remove-entry>Xóa bài viết</button></fieldset>`;
-}
-function navigationEditor() {
-  const content = navigation();
-  return `<details class="admin-section" id="navigation-editor"><summary>Thanh điều hướng & nội dung các tab</summary><p class="muted">Các nhóm sản phẩm nằm trong menu Danh mục. Chỉnh tên, ẩn/hiện và nội dung từng tab bên dưới. Chọn sản phẩm chỉ thay đổi bộ sưu tập hiển thị, không thay giá hoặc áp dụng giảm giá.</p><div class="settings-grid">${editorInput('nav_categoryLabel', 'Tên nút danh mục', content.categoryLabel)}${editorInput('nav_allLabel', 'Tên liên kết xem tất cả', content.allLabel)}</div>${content.items.map(item => `<fieldset class="editor-card" data-navigation-entry="${esc(item.id)}"><legend>${esc(item.label)}</legend><div class="settings-grid">${editorInput('nav_label', 'Tên tab', item.label)}<label>Hiển thị<select name="nav_enabled"><option value="1" ${item.enabled ? 'selected' : ''}>Có</option><option value="0" ${!item.enabled ? 'selected' : ''}>Ẩn</option></select></label>${editorInput('nav_eyebrow', 'Dòng giới thiệu', item.eyebrow)}${editorInput('nav_title', 'Tiêu đề trang', item.title, true)}${editorInput('nav_description', 'Mô tả đầu trang', item.description, true)}${editorInput('nav_image', 'Đường dẫn ảnh đầu trang', item.image)}</div>${editorInput('nav_body', 'Nội dung trang', item.body, true)}${collectionIds.includes(item.id) ? `<label>Sản phẩm trong bộ sưu tập (giữ Ctrl hoặc Cmd để chọn nhiều)<select name="nav_productIds" multiple size="5">${products.map(product => `<option value="${product.id}" ${item.productIds.includes(product.id) ? 'selected' : ''}>#${product.id} — ${esc(product.name)}</option>`).join('')}${item.productIds.filter(id => !products.some(product => product.id === id)).map(id => `<option value="${id}" selected>#${id} — sản phẩm hiện không hiển thị</option>`).join('')}</select></label><p class="muted">${item.id === 'bestsellers' ? 'Để trống: xếp hạng theo số lượng trong đơn hoàn tất. Chọn thủ công: bộ sưu tập do cửa hàng đề xuất, không phải thống kê bán hàng.' : item.id === 'new' ? 'Để trống: hiển thị sản phẩm theo thứ tự thêm mới.' : 'Chỉ là danh sách giới thiệu chiến dịch; chương trình giảm giá cần được triển khai riêng.'}</p>` : ''}</fieldset>`).join('')}</details>`;
-}
-function editorialEditor() {
-  const content = editorial();
-  return `<details class="admin-section" open><summary>Trang chủ: bộ sưu tập & sản phẩm nổi bật</summary><div class="settings-grid">${editorInput('ed_collectionEyebrow', 'Dòng trên tiêu đề danh mục', content.collectionEyebrow)}${editorInput('ed_featuredEyebrow', 'Dòng trên tiêu đề sản phẩm nổi bật', content.featuredEyebrow)}${editorInput('ed_featuredTitle', 'Tiêu đề sản phẩm nổi bật', content.featuredTitle, true)}${editorInput('ed_featuredText', 'Mô tả sản phẩm nổi bật', content.featuredText)}${editorInput('ed_featuredButton', 'Nhãn nút xem tất cả', content.featuredButton)}${editorInput('ed_catalogEyebrow', 'Dòng trên tiêu đề trang danh sách', content.catalogEyebrow)}${editorInput('ed_catalogText', 'Mô tả trang danh sách', content.catalogText, true)}</div><div class="settings-grid" id="category-editors">${content.categoryImages.map(categoryEditor).join('')}</div><button type="button" class="secondary" id="add-category-editor">+ Thêm ảnh danh mục</button></details><details class="admin-section"><summary>Trang chủ: câu chuyện thương hiệu</summary><div class="settings-grid">${editorInput('ed_story_eyebrow', 'Dòng giới thiệu', content.story.eyebrow)}${editorInput('ed_story_title', 'Tiêu đề', content.story.title, true)}${editorInput('ed_story_image', 'Đường dẫn ảnh', content.story.image)}${editorInput('ed_story_button', 'Nhãn nút', content.story.button)}${editorInput('ed_story_text', 'Nội dung', content.story.text, true)}</div></details><details class="admin-section"><summary>Trang chủ: góc cảm hứng & bài viết</summary><div class="settings-grid">${editorInput('ed_journal_eyebrow', 'Dòng giới thiệu', content.journal.eyebrow)}${editorInput('ed_journal_title', 'Tiêu đề', content.journal.title)}${editorInput('ed_journal_text', 'Mô tả', content.journal.text, true)}</div><div class="settings-grid" id="article-editors">${content.journal.articles.map(articleEditor).join('')}</div><button type="button" class="secondary" id="add-article-editor">+ Thêm bài viết</button></details><details class="admin-section"><summary>Dịch vụ & chân trang</summary><div class="settings-grid">${editorInput('ed_serviceTitle', 'Tiêu đề cam kết dịch vụ', content.serviceTitle)}${editorInput('ed_footerHeading', 'Tiêu đề chân trang', content.footerHeading, true)}${editorInput('ed_footerText', 'Nội dung chân trang', content.footerText, true)}</div></details>`;
-}
-async function adminPage() {
-  if (me.user?.role !== 'admin') return `<main class="wrap page"><h1>Quản trị</h1><p>Vui lòng đăng nhập bằng tài khoản quản trị.</p><a class="primary" href="#account">${label('login')}</a></main>`;
-  let content = '';
-  if (adminTab === 'products') {
-    const items = await api('/admin/products');
-    adminPage.products = items;
-    content = `<div class="row admin-section-heading"><div><h2>Danh sách sản phẩm</h2><p class="muted">${items.length} sản phẩm · Chỉnh sửa nội dung, ảnh và thông số tại đây.</p></div><button class="primary" id="new-product">${icon('plus')}Thêm sản phẩm</button></div><div class="table-scroll"><table class="admin-table"><thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn</th><th>Hiển thị</th><th>Thao tác</th></tr></thead><tbody>${items.map(product => `<tr><td><div class="admin-product"><img src="${esc(product.image)}" alt=""><div><strong>${esc(product.name)}</strong><span>${esc(details(product).sku || '')}${details(product).is_sample ? ' · Dữ liệu mẫu' : ''}</span></div></div></td><td>${esc(product.category)}</td><td>${money(product.price)}</td><td>${product.stock}</td><td><span class="status-pill ${product.active ? 'visible' : ''}">${product.active ? 'Có' : 'Ẩn'}</span></td><td class="table-actions"><button data-edit="${product.id}">Sửa</button><button class="danger" data-delete="${product.id}">Xóa</button></td></tr>`).join('')}</tbody></table></div>`;
-  } else if (adminTab === 'orders') {
-    const orders = await api('/admin/orders');
-    content = `<h2>Đơn hàng</h2>${orders.map(order => orderCard(order, true)).join('') || '<p class="empty">Chưa có đơn hàng.</p>'}`;
-  } else {
-    content = `<h2>Nội dung & cấu hình cửa hàng</h2><p class="notice admin-note">Toàn bộ nội dung trang chủ, thông tin sản phẩm và thông tin nhận chuyển khoản có thể chỉnh sửa tại đây. Hình ảnh nhận đường dẫn HTTPS hoặc đường dẫn tệp có sẵn. Nhấn “Lưu nội dung cửa hàng” để áp dụng.</p><form id="settings" class="form"><details class="admin-section" open><summary>Thương hiệu, banner & thông tin cửa hàng</summary><div class="settings-grid">${Object.entries(settingNames).filter(([key]) => !['shippingFee', 'freeShipping', 'bankName', 'bankAccount', 'bankHolder'].includes(key)).map(([key, title]) => editorInput(key, title, config[key], ['heroText', 'footerText', 'heroTitle'].includes(key))).join('')}<label>Danh mục (mỗi dòng một tên)<textarea name="categories">${esc(config.categories.join('\n'))}</textarea></label><label>Cam kết dịch vụ (mỗi dòng một mục)<textarea name="benefits">${esc(config.benefits.join('\n'))}</textarea></label>${Object.entries(config.colors).map(([key, value]) => `<label>Màu ${esc(key)}<input type="color" name="color_${esc(key)}" value="${esc(value)}"></label>`).join('')}</div><div class="settings-grid"><label>Tải logo lên (PNG/JPEG/WebP, tối đa 5 MB)<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="logo"></label><label>Tải ảnh banner lên<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="heroImage"></label></div></details>${navigationEditor()}${editorialEditor()}<details class="admin-section"><summary>Phí giao hàng & tài khoản ngân hàng</summary><div class="settings-grid">${['shippingFee', 'freeShipping'].map(key => `<label>${settingNames[key]}<input type="number" name="${key}" min="0" step="1" value="${config[key]}"></label>`).join('')}${['bankName', 'bankAccount', 'bankHolder'].map(key => editorInput(key, settingNames[key], config[key])).join('')}</div><p class="muted">Chuyển khoản chỉ xuất hiện khi điền đủ ngân hàng, số tài khoản và chủ tài khoản. Không nhập mật khẩu ngân hàng hoặc mã bí mật.</p></details><details class="admin-section"><summary>Chính sách & nhãn giao diện</summary><label>Các trang chính sách (JSON: title, body)<textarea class="code" name="policies">${esc(JSON.stringify(config.policies, null, 2))}</textarea></label><label>Nội dung giao diện (giữ nguyên khóa JSON)<textarea class="code" name="ui">${esc(JSON.stringify(config.ui, null, 2))}</textarea></label><label>Nhãn nút & điều hướng (giữ nguyên khóa JSON)<textarea class="code" name="labels">${esc(JSON.stringify(config.labels, null, 2))}</textarea></label></details><div class="error" role="alert"></div><button class="primary save-settings">Lưu nội dung cửa hàng ${icon('check')}</button></form>`;
-  }
-  return `<main class="wrap page admin-page"><div class="admin-heading"><div><span class="eyebrow">BẢNG ĐIỀU KHIỂN</span><h1>Quản trị ${esc(config.brand)}</h1></div><a class="secondary" href="#">Xem cửa hàng ${icon('arrow')}</a></div><div class="tabs admin-tabs">${[['products', 'Sản phẩm'], ['orders', 'Đơn hàng'], ['settings', 'Nội dung & cài đặt']].map(([value, text]) => `<button class="chip ${value === adminTab ? 'active' : ''}" data-tab="${value}">${text}</button>`).join('')}</div>${content}</main>`;
-}
 function editProduct(product = { name: '', category: config.categories[0] || '', description: '', price: 0, stock: 0, image: '', active: 0 }) {
   const info = details(product);
-  modal(`<h2>${product.id ? 'Sửa' : 'Thêm'} sản phẩm</h2><p class="muted">Thông tin này hiển thị trên thẻ và trang chi tiết sản phẩm.</p><form id="product-form" class="form"><label>Tên sản phẩm<input name="name" required maxlength="200" value="${esc(product.name)}"></label><div class="settings-grid"><label>Danh mục<select name="category">${[...new Set([...config.categories, product.category])].filter(Boolean).map(name => `<option ${name === product.category ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></label>${editorInput('detail_sku', 'Mã sản phẩm (SKU)', info.sku)}${editorInput('detail_badge', 'Nhãn trên thẻ sản phẩm', info.badge)}<label>Dữ liệu mẫu<select name="detail_is_sample"><option value="1" ${info.is_sample ? 'selected' : ''}>Có — hiển thị nhãn mẫu tham khảo</option><option value="0" ${!info.is_sample ? 'selected' : ''}>Không — sản phẩm chính thức</option></select></label></div>${editorInput('detail_summary', 'Giới thiệu ngắn (trên thẻ sản phẩm)', info.summary, true)}<label>Mô tả chi tiết<textarea name="description" maxlength="10000">${esc(product.description)}</textarea></label><div class="settings-grid"><label>Giá (đ)<input type="number" name="price" min="0" max="1000000000" step="1" required value="${product.price}"></label><label>Tồn kho<input type="number" name="stock" min="0" max="1000000" step="1" required value="${product.stock}"></label></div><label>Đường dẫn ảnh chính<input name="image" value="${esc(product.image)}"></label><label>Tải ảnh sản phẩm lên<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="image"></label>${editorInput('detail_gallery', 'Ảnh bổ sung (mỗi dòng một đường dẫn ảnh)', (info.gallery || []).join('\n'), true)}<div class="settings-grid">${[['material', 'Chất liệu'], ['dimensions', 'Kích thước'], ['capacity', 'Dung tích'], ['color', 'Màu sắc']].map(([key, title]) => editorInput('detail_' + key, title, info[key])).join('')}</div>${editorInput('detail_features', 'Đặc điểm nổi bật (mỗi dòng một mục)', (info.features || []).join('\n'), true)}${editorInput('detail_specifications', 'Thông số khác (mỗi dòng: tên thông số: giá trị)', (info.specifications || []).map(spec => spec.label + ': ' + spec.value).join('\n'), true)}${editorInput('detail_care', 'Hướng dẫn sử dụng & bảo quản', info.care, true)}<label>Hiển thị<select name="active"><option value="1" ${product.active ? 'selected' : ''}>Có</option><option value="0" ${!product.active ? 'selected' : ''}>Ẩn</option></select></label><div class="error" role="alert"></div><button class="primary">Lưu sản phẩm ${icon('check')}</button></form>`);
+  modal(`<h2>${product.id ? 'Sửa' : 'Thêm'} sản phẩm</h2><p class="muted">Nhập thông tin cơ bản trước. Mở các nhóm bên dưới khi cần bổ sung nội dung chi tiết.</p><form id="product-form" class="form">
+    <section class="product-editor-section"><h3>Thông tin cơ bản</h3><label>Tên sản phẩm<input name="name" required maxlength="200" value="${esc(product.name)}"></label>
+    <div class="settings-grid"><label>Danh mục<select name="category">${[...new Set([...config.categories, product.category])].filter(Boolean).map(name => `<option ${name === product.category ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></label>${editorInput('detail_sku', 'Mã sản phẩm (SKU)', info.sku)}<label>Giá bán (đ)<input type="number" name="price" min="0" max="1000000000" step="1" required value="${product.price}"></label><label>Số lượng tồn kho<input type="number" name="stock" min="0" max="1000000" step="1" required value="${product.stock}"></label><label>Trạng thái<select name="active"><option value="1" ${product.active ? 'selected' : ''}>Đang bán — hiện trên cửa hàng</option><option value="0" ${!product.active ? 'selected' : ''}>Đang ẩn — lưu bản nháp</option></select></label><label>Dữ liệu mẫu<select name="detail_is_sample"><option value="1" ${info.is_sample ? 'selected' : ''}>Mẫu tham khảo</option><option value="0" ${!info.is_sample ? 'selected' : ''}>Sản phẩm chính thức</option></select></label></div></section>
+    <section class="product-editor-section"><h3>Ảnh sản phẩm</h3><img class="admin-image-preview" id="product-image-preview" src="${esc(product.image)}" alt="Ảnh chính" ${product.image ? '' : 'hidden'}><label>Tải ảnh chính lên<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="image"><small>PNG, JPG hoặc WebP, tối đa 5 MB. Nhấn Lưu sản phẩm sau khi tải.</small></label><label>Hoặc dùng đường dẫn ảnh<input name="image" value="${esc(product.image)}" placeholder="/uploads/anh.webp hoặc https://..."></label><details class="admin-section"><summary>Thêm ảnh trong thư viện</summary>${editorInput('detail_gallery', 'Mỗi dòng một đường dẫn ảnh', (info.gallery || []).join('\n'), true)}</details></section>
+    <section class="product-editor-section"><h3>Nội dung giới thiệu</h3>${editorInput('detail_summary', 'Giới thiệu ngắn (trên thẻ sản phẩm)', info.summary, true)}<label>Mô tả chi tiết<textarea name="description" maxlength="10000">${esc(product.description)}</textarea></label></section>
+    <details class="admin-section"><summary>Thông số & đặc điểm sản phẩm</summary><div class="settings-grid">${[['material', 'Chất liệu'], ['dimensions', 'Kích thước'], ['capacity', 'Dung tích'], ['color', 'Màu sắc']].map(([key, title]) => editorInput('detail_' + key, title, info[key])).join('')}</div>${editorInput('detail_badge', 'Nhãn nổi bật trên thẻ sản phẩm', info.badge)}${editorInput('detail_features', 'Đặc điểm nổi bật (mỗi dòng một mục)', (info.features || []).join('\n'), true)}${editorInput('detail_specifications', 'Thông số khác (mỗi dòng: tên thông số: giá trị)', (info.specifications || []).map(spec => spec.label + ': ' + spec.value).join('\n'), true)}${editorInput('detail_care', 'Hướng dẫn sử dụng & bảo quản', info.care, true)}</details>
+    <div class="error" role="alert"></div><button class="primary">Lưu sản phẩm ${icon('check')}</button></form>`);
   bindUploads($('#product-form'));
+  const imageInput = $('#product-form [name="image"]');
+  const preview = () => { const img = $('#product-image-preview'); img.hidden = !imageInput.value; img.src = imageInput.value; };
+  imageInput.addEventListener('input', preview);
+  imageInput.addEventListener('change', preview);
   $('#product-form').onsubmit = event => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -261,15 +248,17 @@ async function render() {
   const current = ++generation;
   try {
     const route = location.hash.slice(1);
-    const body = route === 'cart' ? cartPage() : route === 'account' ? await accountPage() : route === 'admin' ? await adminPage() : route === 'products' ? catalog() : route.startsWith('collection/') || route.startsWith('page/') ? await navigationPage(route.split('/')[1]) : route.startsWith('product/') ? productPage(Number(route.split('/')[1])) : route === 'inspiration' ? `<main class="wrap page">${journalSection()}</main>` : home();
+    const body = route === 'cart' ? cartPage() : route === 'account' ? await accountPage() : (route === 'admin' || route.startsWith('admin/')) ? await adminUI.page(route.split('/')[1] || '') : route === 'products' ? catalog() : route.startsWith('collection/') || route.startsWith('page/') ? await navigationPage(route.split('/')[1]) : route.startsWith('product/') ? productPage(Number(route.split('/')[1])) : route === 'inspiration' ? `<main class="wrap page">${journalSection()}</main>` : home();
     if (current !== generation) return;
     const activeProduct = route.startsWith('product/') && products.find(item => item.id === Number(route.split('/')[1]));
     const activePage = navigation().items.find(item => navigationHref(item) === '#' + route);
     document.title = (activeProduct ? activeProduct.name : activePage ? activePage.title : config.brand) + ' — ' + config.tagline;
     for (const [key, value] of Object.entries(config.colors)) document.documentElement.style.setProperty('--' + key, value);
-    $('#app').innerHTML = header() + body + footer();
-    if (route !== 'admin') applyCopy($('#app'));
+    const adminRoute = route === 'admin' || route.startsWith('admin/');
+    $('#app').innerHTML = adminRoute ? body : header() + body + footer();
+    if (!adminRoute) applyCopy($('#app'));
     bind();
+    if (adminRoute) adminUI.bind();
     motion.enhancePage($('#app'), route !== lastRenderedRoute);
     lastRenderedRoute = route;
   } catch (error) { toast(error.message); }
@@ -285,12 +274,13 @@ function bindUploads(root) {
       const response = await fetch('/api/admin/upload', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-CSRF-Token': me.csrf }, body: file });
       const data = await response.json();
       if (!response.ok) throw Error(data.error);
-      root.querySelector('[name="' + input.dataset.upload + '"]').value = data.url;
+      const target = root.querySelector('[name="' + input.dataset.upload + '"]');
+      target.value = data.url;
+      target.dispatchEvent(new Event('change', { bubbles: true }));
       toast('Đã tải ảnh. Nhấn Lưu để áp dụng.');
     } catch (error) { toast(error.message); } finally { buttons.forEach(button => { button.disabled = false; button.classList.remove('is-pending'); button.removeAttribute('aria-busy'); }); }
   });
 }
-function bindEditorRemove() { document.querySelectorAll('[data-remove-entry]').forEach(button => button.onclick = () => button.closest('fieldset').remove()); }
 function bind() {
   if ($('#category-toggle')) {
     const toggle = $('#category-toggle'), panel = $('#category-panel'), menu = toggle.closest('.category-menu');
@@ -344,7 +334,7 @@ function bind() {
     };
   }
   if ($('#settings')) bindUploads($('#settings'));
-  $('#search').onsubmit = event => { event.preventDefault(); query = new FormData(event.currentTarget).get('q').trim(); location.hash = 'products'; render(); };
+  if ($('#search')) $('#search').onsubmit = event => { event.preventDefault(); query = new FormData(event.currentTarget).get('q').trim(); location.hash = 'products'; render(); };
   document.querySelectorAll('[data-category],[data-filter]').forEach(button => button.onclick = () => { category = button.dataset.category ?? button.dataset.filter; if (location.hash !== '#products') location.hash = 'products'; else render(); });
   document.querySelectorAll('[data-add]').forEach(button => button.onclick = () => add(Number(button.dataset.add), 1, button));
   document.querySelectorAll('[data-policy]').forEach(button => button.onclick = () => { const policy = config.policies[Number(button.dataset.policy)]; modal(`<span class="eyebrow">${esc(config.brand)}</span><h2>${esc(policy.title)}</h2><p class="policy">${esc(policy.body)}</p>`); });
@@ -360,53 +350,29 @@ function bind() {
   if ($('#clear-search')) $('#clear-search').onclick = () => { query = ''; render(); };
   document.querySelectorAll('[data-auth]').forEach(button => button.onclick = () => { const mode = button.dataset.auth; $('#auth').dataset.mode = mode; $('#name-field').hidden = mode === 'login'; $('#name-field input').required = mode === 'register'; $('#auth button').innerHTML = esc(config.labels[mode]) + icon('arrow'); $('#auth input[name=password]').autocomplete = mode === 'login' ? 'current-password' : 'new-password'; document.querySelectorAll('[data-auth]').forEach(item => item.classList.toggle('active', item === button)); });
   if ($('#auth')) $('#auth').onsubmit = event => { event.preventDefault(); const form = event.currentTarget; submit(form, async () => { me = await api('/' + form.dataset.mode, { method: 'POST', body: Object.fromEntries(new FormData(form)) }); await render(); toast('Đăng nhập thành công'); }); };
-  if ($('#logout')) $('#logout').onclick = async () => { try { await api('/logout', { method: 'POST' }); me = { user: null }; await render(); } catch (error) { toast(error.message); } };
+  if ($('#logout')) $('#logout').onclick = logoutSession;
+  document.querySelectorAll('[data-own-password]').forEach(button => button.onclick = changePassword);
   if ($('#checkout')) $('#checkout').onsubmit = event => { event.preventDefault(); const form = event.currentTarget; submit(form, async () => { const result = await api('/orders', { method: 'POST', body: { ...Object.fromEntries(new FormData(form)), items: cart.map(({ id, quantity }) => ({ id, quantity })) } }); cart = []; saveCart(); await refresh(); location.hash = 'account'; toast('Đã tạo đơn #' + result.id); }); };
-  document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { adminTab = button.dataset.tab; render(); });
-  if ($('#new-product')) $('#new-product').onclick = () => editProduct();
-  document.querySelectorAll('[data-edit]').forEach(button => button.onclick = () => editProduct(adminPage.products.find(product => product.id === Number(button.dataset.edit))));
-  document.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => { modal('<h2>Xóa sản phẩm?</h2><p>Đơn hàng đã đặt vẫn giữ thông tin sản phẩm.</p><button id="confirm-delete" class="primary">Xác nhận xóa</button>'); $('#confirm-delete').onclick = () => submit($('#modal'), async () => { await api('/admin/products/' + button.dataset.delete, { method: 'DELETE' }); await motion.closeDialog($('#modal')); await refresh(); toast('Đã xóa sản phẩm'); }); });
-  bindEditorRemove();
-  if ($('#add-category-editor')) $('#add-category-editor').onclick = () => { $('#category-editors').insertAdjacentHTML('beforeend', categoryEditor()); bindEditorRemove(); };
-  if ($('#add-article-editor')) $('#add-article-editor').onclick = () => { $('#article-editors').insertAdjacentHTML('beforeend', articleEditor()); bindEditorRemove(); };
-  if ($('#settings')) $('#settings').onsubmit = event => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    submit(form, async () => {
-      const data = Object.fromEntries(new FormData(form));
-      const settings = structuredClone(config);
-      for (const key of Object.keys(settingNames)) settings[key] = typeof config[key] === 'number' ? Number(data[key]) : data[key];
-      settings.categories = lines(data.categories);
-      settings.benefits = lines(data.benefits);
-      settings.policies = JSON.parse(data.policies);
-      settings.labels = JSON.parse(data.labels);
-      settings.ui = JSON.parse(data.ui);
-      for (const key of Object.keys(settings.colors)) settings.colors[key] = data['color_' + key];
-      const content = structuredClone(editorial());
-      for (const key of ['collectionEyebrow', 'featuredEyebrow', 'featuredTitle', 'featuredText', 'featuredButton', 'catalogEyebrow', 'catalogText', 'serviceTitle', 'footerHeading', 'footerText']) content[key] = data['ed_' + key];
-      for (const key of ['eyebrow', 'title', 'text', 'image', 'button']) content.story[key] = data['ed_story_' + key];
-      for (const key of ['eyebrow', 'title', 'text']) content.journal[key] = data['ed_journal_' + key];
-      content.categoryImages = [...form.querySelectorAll('[data-category-entry]')].map(entry => Object.fromEntries([['category', 'ed_category'], ['image', 'ed_category_image'], ['caption', 'ed_category_caption']].map(([key, name]) => [key, entry.querySelector('[name="' + name + '"]').value.trim()]))).filter(entry => entry.category);
-      content.journal.articles = [...form.querySelectorAll('[data-article-entry]')].map(entry => Object.fromEntries(['title', 'image', 'excerpt', 'body'].map(key => [key, entry.querySelector('[name="ed_article_' + key + '"]').value.trim()]))).filter(entry => entry.title);
-      settings.navigation = {
-        categoryLabel: data.nav_categoryLabel.trim(), allLabel: data.nav_allLabel.trim(),
-        items: [...form.querySelectorAll('[data-navigation-entry]')].map(entry => {
-          const original = navigation().items.find(item => item.id === entry.dataset.navigationEntry);
-          const item = { ...original, enabled: entry.querySelector('[name="nav_enabled"]').value === '1' };
-          for (const key of ['label', 'eyebrow', 'title', 'description', 'image', 'body']) item[key] = entry.querySelector('[name="nav_' + key + '"]').value.trim();
-          const select = entry.querySelector('[name="nav_productIds"]');
-          if (select) item.productIds = [...select.selectedOptions].map(option => Number(option.value));
-          return item;
-        }),
-      };
-      settings.editorial = content;
-      await api('/admin/settings', { method: 'PUT', body: settings });
-      await refresh();
-      toast('Đã lưu nội dung');
-    });
-  };
   document.querySelectorAll('.order-status').forEach(form => form.onsubmit = event => { event.preventDefault(); submit(form, async () => { await api('/admin/orders/' + form.dataset.id, { method: 'PATCH', body: { status: new FormData(form).get('status') } }); await render(); toast('Đã cập nhật đơn hàng'); }); });
 }
+async function reloadUser() {
+  me = await api('/me');
+  if (!me.user && location.hash.startsWith('#admin')) location.hash = 'account';
+}
+async function logoutSession() {
+  try { await api('/logout', { method: 'POST' }); me = { user: null }; location.hash = 'account'; await render(); }
+  catch (error) { toast(error.message); }
+}
+function changePassword() {
+  modal(`<h2>Đổi mật khẩu</h2><p>Mật khẩu mới cần từ 12 ký tự. Sau khi đổi, bạn sẽ đăng nhập lại trên các thiết bị.</p><form class="form" id="change-password"><label>Mật khẩu hiện tại<input type="password" name="currentPassword" required maxlength="128" autocomplete="current-password"></label><label>Mật khẩu mới<input type="password" name="newPassword" required minlength="12" maxlength="128" autocomplete="new-password"></label><label>Nhập lại mật khẩu mới<input type="password" name="confirmPassword" required minlength="12" maxlength="128" autocomplete="new-password"></label><p class="error" role="alert"></p><button class="primary">Đổi mật khẩu</button></form>`);
+  const form = $('#change-password'); form.onsubmit = event => { event.preventDefault(); submit(form, async () => {
+    if (form.elements.newPassword.value !== form.elements.confirmPassword.value) throw Error('Hai mật khẩu mới chưa trùng nhau.');
+    await api('/account/password', { method: 'POST', body: { currentPassword: form.elements.currentPassword.value, newPassword: form.elements.newPassword.value } });
+    await motion.closeDialog($('#modal')); me = { user: null }; location.hash = 'account'; await render(); toast('Đã đổi mật khẩu. Vui lòng đăng nhập lại.');
+  }); };
+}
+const adminUI = createAdminUI({ api, esc, money, icon, modal, submit, statusNames, editProduct, orderCard, getUser: () => me.user, getConfig: () => config, getCsrf: () => me.csrf, products: () => products, refresh, render, reloadUser, logout: logoutSession, changePassword, toast, closeModal: () => motion.closeDialog($('#modal')) });
+window.addEventListener('beforeunload', event => { if (adminUI.isDirty()) { event.preventDefault(); event.returnValue = ''; } });
 motion.installDialog($('#modal'));
 document.addEventListener('click', event => { if (!event.target.closest('.category-menu')) closeCategories(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && $('#category-toggle')?.getAttribute('aria-expanded') === 'true') closeCategories(true); });
