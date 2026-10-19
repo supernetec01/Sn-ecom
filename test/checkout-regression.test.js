@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -11,7 +12,7 @@ test('Checkout validates phones and atomically replays requests without consumin
  const dir=mkdtempSync(join(tmpdir(),'sn-checkout-')); const db=openStore(dir);
  const server=createApp(db).listen(0,'127.0.0.1'); await once(server,'listening');
  const base=`http://127.0.0.1:${server.address().port}`;
- async function post(path,body,headers={}) {const r=await fetch(base+'/api'+path,{method:'POST',headers:{origin:base,'content-type':'application/json',...headers},body:JSON.stringify(body)}); return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};}
+ async function post(path,body,headers={}) {const r=await fetch(base+'/api'+path,{method:'POST',headers:{origin:base,'content-type':'application/json',...(path==='/orders'?{'Idempotency-Key':randomUUID()}:{}),...headers},body:JSON.stringify(body)}); return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};}
  try {
   const a=await post('/register',{name:'Regression',email:'regression@example.test',password:'test-password-123456'});
   assert.equal(a.status,201);

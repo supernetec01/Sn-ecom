@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
@@ -9,7 +10,7 @@ import {openStore,hashPassword} from '../store.js';
 import {sampleCatalog} from '../sample-catalog.js';
 test('Store integration: authentication, pricing, permissions, checkout and administration',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'sn-test-')),db=openStore(dir),server=createApp(db).listen(0,'127.0.0.1');await once(server,'listening');const base=`http://127.0.0.1:${server.address().port}`;
- const request=async(path,{method='GET',body,cookie,csrf,origin=base}={})=>{const r=await fetch(base+'/api'+path,{method,headers:{'Content-Type':'application/json',Origin:origin,...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};};
+ const request=async(path,{method='GET',body,cookie,csrf,origin=base}={})=>{const r=await fetch(base+'/api'+path,{method,headers:{'Content-Type':'application/json',Origin:origin,...(path==='/orders'&&method==='POST'?{'Idempotency-Key':randomUUID()}:{}),...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};};
  try{
  let buyer,other,admin,product,order;
  await t.test('Catalog and registration persist; role cannot be supplied by client',async()=>{const ps=await request('/products');assert.equal(ps.data.length,sampleCatalog.length);product=ps.data[0];buyer=await request('/register',{method:'POST',body:{email:'buyer@example.com',name:'Buyer',password:'secure-password-123',role:'admin'}});assert.equal(buyer.status,201);assert.equal(buyer.data.user.role,'customer');assert.ok(buyer.cookie.includes('sn_session='));const session=await request('/me',{cookie:buyer.cookie});assert.equal(session.data.user.email,'buyer@example.com');const hash=db.prepare('SELECT password FROM users WHERE id=?').get(buyer.data.user.id).password;assert.ok(!hash.includes('secure-password-123'));});

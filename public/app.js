@@ -70,7 +70,7 @@ function add(id, quantity = 1, source = null) {
   const product = products.find(item => item.id === id);
   if (!product?.stock) return toast('Sản phẩm đã hết hàng.');
   let variant_id;
-  if (product.variants?.length) { variant_id = Number($('#variant-picker')?.value); if (!variant_id) { location.hash = 'product/'+id; return toast('Chọn phiên bản trước khi thêm vào giỏ.'); } }
+  if (product.has_variants || product.variants?.length) { variant_id = Number($('#variant-picker')?.value); if (!variant_id) { location.hash = 'product/'+id; return toast('Chọn phiên bản trước khi thêm vào giỏ.'); } }
   const stock = variant_id ? product.variants.find(v=>v.id===variant_id)?.stock || 0 : product.stock;
   const item = cart.find(line => line.id === id && (line.variant_id||0)===(variant_id||0));
   if (!Number.isSafeInteger(quantity) || quantity < 1 || (item?.quantity || 0) + quantity > Math.min(stock, 99)) return toast('Số lượng vượt quá tồn kho hoặc giới hạn 99 sản phẩm.');

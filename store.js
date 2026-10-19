@@ -1,4 +1,5 @@
 import { migrateCommerce } from './commerce-store.js';
+import { registerCatalogFunctions } from './catalog.js';
 import { migrateTranslations } from './translations.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -110,7 +111,7 @@ export function seedDemoCatalog(db) {
 export function hashPassword(password) { const salt=randomBytes(16).toString('hex'); return `${salt}:${scryptSync(password,salt,64).toString('hex')}`; }
 export function checkPassword(password, hash) { try {const [salt,key]=hash.split(':'); return timingSafeEqual(Buffer.from(key,'hex'),scryptSync(password,salt,64));}catch{return false;} }
 export function openStore(dir=process.env.DATA_DIR || './data') {
- mkdirSync(dir,{recursive:true,mode:0o700}); const db=new DatabaseSync(path.join(dir,'store.sqlite')); db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+ mkdirSync(dir,{recursive:true,mode:0o700}); const db=new DatabaseSync(path.join(dir,'store.sqlite')); registerCatalogFunctions(db); db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
  CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,password TEXT NOT NULL,role TEXT NOT NULL DEFAULT 'customer');
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),csrf TEXT NOT NULL,expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL);

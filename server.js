@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { assertSkuAvailable, normalizeSku, productVariants } from './catalog.js';
 import { installTranslations } from './translations.js';
 import { installCommerce } from './commerce-api.js';
 import { decorateProduct, verifyTotp, movement, audit, transact, expireOrders, useMfa } from './commerce-store.js';
@@ -88,11 +89,46 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
  app.use('/api/admin',auth,admin);
  const uploadDir=path.resolve(path.dirname(db.location('main')||path.resolve(process.env.DATA_DIR||'./data','store.sqlite')),'uploads');mkdirSync(uploadDir,{recursive:true,mode:0o700});
  app.post('/api/admin/upload',csrf,express.raw({type:'application/octet-stream',limit:'5mb'}),async(req,res)=>{const b=req.body;if(!Buffer.isBuffer(b)||b.length<12)return fail(res,'Tệp ảnh không hợp lệ.');try{const metadata=await sharp(b,{limitInputPixels:25000000}).metadata();if(!['png','jpeg','webp'].includes(metadata.format))return fail(res,'Chỉ nhận PNG, JPEG hoặc WebP.');const converted=await sharp(b,{limitInputPixels:25000000,animated:false}).rotate().resize({width:2400,height:2400,fit:'inside',withoutEnlargement:true}).webp({quality:85}).toBuffer();const name=randomBytes(20).toString('hex')+'.webp';writeFileSync(path.join(uploadDir,name),converted,{mode:0o600});audit(db,req.session.user_id,'image_upload',name);res.status(201).json({url:'/uploads/'+name});}catch{return fail(res,'Không giải mã được ảnh. Chỉ dùng PNG/JPEG/WebP hợp lệ, tối đa 5 MB và 25 triệu điểm ảnh.');}});
- app.get('/api/admin/products',(req,res)=>res.json(db.prepare('SELECT * FROM products ORDER BY id DESC').all().map(p=>({...decorateProduct(db,p,readProduct),base_price:p.price,base_stock:p.stock}))));
- function product(req,res,next){const p=req.body;if(!str(p.name,200)||!p.name.trim()||!str(p.category,100)||!settings().categories.includes(p.category)||!str(p.description,10000)||!integer(p.price,1e9)||!integer(p.stock,1e6)||!safeImage(p.image)||![0,1].includes(p.active)||(p.details!==undefined&&!productDetailsValid(p.details)))return fail(res,'Thông tin sản phẩm không hợp lệ.');const sku=p.details?.sku?.trim();if(sku&&(db.prepare("SELECT id FROM products WHERE json_extract(details,'$.sku')=? AND id!=?").get(sku,Number(req.params.id)||0)||db.prepare('SELECT id FROM product_variants WHERE sku=?').get(sku)))return fail(res,'SKU đã tồn tại.');next();}
- app.post('/api/admin/products',csrf,product,(req,res)=>{const p=req.body;const r=db.prepare('INSERT INTO products(name,category,description,price,stock,image,active,details) VALUES(?,?,?,?,?,?,?,?)').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,JSON.stringify(p.details??{}));movement(db,Number(r.lastInsertRowid),null,p.stock,'product_created',null,req.session.user_id);audit(db,req.session.user_id,'product_created',Number(r.lastInsertRowid));res.status(201).json({id:Number(r.lastInsertRowid)});});
- app.put('/api/admin/products/:id',csrf,product,(req,res)=>{const p=req.body;const previous=db.prepare('SELECT * FROM products WHERE id=?').get(req.params.id);const r=db.prepare('UPDATE products SET name=?,category=?,description=?,price=?,stock=?,image=?,active=?,details=COALESCE(?,details) WHERE id=?').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,p.details===undefined?null:JSON.stringify(p.details),req.params.id);if(r.changes){if(previous.stock!==p.stock)movement(db,previous.id,null,p.stock-previous.stock,'admin_edit',null,req.session.user_id);audit(db,req.session.user_id,'product_update',previous.id);res.json({ok:true});}else fail(res,'Không tìm thấy sản phẩm.',404);});
- app.delete('/api/admin/products/:id',csrf,(req,res)=>{db.prepare('UPDATE products SET active=0 WHERE id=?').run(req.params.id);audit(db,req.session.user_id,'product_hide',req.params.id);res.json({ok:true});});
+ app.get('/api/admin/products',(req,res)=>res.json(db.prepare('SELECT * FROM products ORDER BY id DESC').all().map(p=>({...decorateProduct(db,p,readProduct),base_price:p.price,base_stock:p.stock,all_variants:productVariants(db,p.id)}))));
+ function product(req,res,next){
+  const p=req.body;
+  if(!str(p.name,200)||!p.name.trim()||!str(p.category,100)||!settings().categories.includes(p.category)||!str(p.description,10000)||!integer(p.price,1e9)||!integer(p.stock,1e6)||!safeImage(p.image)||![0,1].includes(p.active)||(p.details!==undefined&&!productDetailsValid(p.details)))return fail(res,'Thông tin sản phẩm không hợp lệ.');
+  if(p.details && Object.hasOwn(p.details,'sku'))p.details={...p.details,sku:normalizeSku(p.details.sku)};
+  next();
+ }
+ const catalogWrite=fn=>(req,res,next)=>{
+  try{fn(req,res);}catch(error){if(error.status)return fail(res,error.message,error.status);next(error);}
+ };
+ app.post('/api/admin/products',csrf,product,catalogWrite((req,res)=>{
+  const p=req.body;
+  const id=transact(db,()=>{
+   assertSkuAvailable(db,p.details?.sku);
+   const id=Number(db.prepare('INSERT INTO products(name,category,description,price,stock,image,active,details) VALUES(?,?,?,?,?,?,?,?)').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,JSON.stringify(p.details??{})).lastInsertRowid);
+   movement(db,id,null,p.stock,'product_created',null,req.session.user_id);
+   audit(db,req.session.user_id,'product_created',id,JSON.stringify({after:{price:p.price,stock:p.stock,active:p.active,sku:p.details?.sku||''}}));
+   return id;
+  });
+  res.status(201).json({id});
+ }));
+ app.put('/api/admin/products/:id',csrf,product,catalogWrite((req,res)=>{
+  const p=req.body;
+  transact(db,()=>{
+   const previous=db.prepare('SELECT * FROM products WHERE id=?').get(req.params.id);
+   if(!previous)throw Object.assign(Error('Không tìm thấy sản phẩm.'),{status:404});
+   assertSkuAvailable(db,p.details?.sku,{productId:previous.id});
+   db.prepare('UPDATE products SET name=?,category=?,description=?,price=?,stock=?,image=?,active=?,details=COALESCE(?,details) WHERE id=?').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,p.details===undefined?null:JSON.stringify(p.details),previous.id);
+   if(previous.stock!==p.stock)movement(db,previous.id,null,p.stock-previous.stock,'admin_edit',null,req.session.user_id);
+   audit(db,req.session.user_id,'product_update',previous.id,JSON.stringify({before:{price:previous.price,stock:previous.stock,active:previous.active,sku:normalizeSku(JSON.parse(previous.details).sku)},after:{price:p.price,stock:p.stock,active:p.active,sku:p.details===undefined?normalizeSku(JSON.parse(previous.details).sku):p.details.sku||''}}));
+  });
+  res.json({ok:true});
+ }));
+ app.delete('/api/admin/products/:id',csrf,catalogWrite((req,res)=>{
+  transact(db,()=>{
+   db.prepare('UPDATE products SET active=0 WHERE id=?').run(req.params.id);
+   audit(db,req.session.user_id,'product_hide',req.params.id);
+  });
+  res.json({ok:true});
+ }));
  app.get('/api/admin/settings',(req,res)=>res.json(settings()));
  app.put('/api/admin/settings',csrf,(req,res)=>{const s=req.body,old=settings();if(req.session.role!=='admin'&&['bankName','bankAccount','bankHolder','shippingFee','freeShipping'].some(k=>s[k]!==old[k]))return fail(res,'Chỉ quản trị viên được đổi thông tin thanh toán và phí giao.',403);if(Object.keys(s).sort().join()!==Object.keys(old).sort().join())return fail(res,'Cần giữ đúng các trường cấu hình.');for(const k of Object.keys(old)){if(typeof old[k]==='string'&&!str(s[k],10000))return fail(res,`Trường ${k} không hợp lệ.`);}if(!integer(s.shippingFee,1e7)||!integer(s.freeShipping,1e9)||!safeImage(s.logo)||!safeImage(s.heroImage)||!Array.isArray(s.categories)||s.categories.length>50||!s.categories.every(c=>str(c,100)&&c.trim())||!Array.isArray(s.benefits)||s.benefits.length>10||!s.benefits.every(c=>str(c,200))||!Array.isArray(s.policies)||s.policies.length>20||!s.policies.every(p=>p&&str(p.title,100)&&str(p.body,10000)))return fail(res,'Cấu hình không hợp lệ.');if(!editorialValid(s.editorial))return fail(res,'Nội dung bộ sưu tập, câu chuyện hoặc bài viết không hợp lệ.');if(!navigationValid(s.navigation))return fail(res,'Nội dung thanh điều hướng không hợp lệ.');if(!s.ui||Object.keys(s.ui).sort().join()!==Object.keys(old.ui).sort().join()||!Object.values(s.ui).every(v=>str(v,500)))return fail(res,'Nội dung giao diện không hợp lệ.');if(!s.colors||Object.keys(old.colors).some(k=>!/^#[0-9a-f]{6}$/i.test(s.colors[k]))||!s.labels||Object.keys(s.labels).sort().join()!==Object.keys(old.labels).sort().join()||!Object.values(s.labels).every(v=>str(v,200)))return fail(res,'Màu sắc hoặc nhãn giao diện không hợp lệ.');transact(db,()=>{db.prepare('UPDATE settings SET value=? WHERE id=1').run(JSON.stringify(s));audit(db,req.session.user_id,'store_settings','settings');});res.json({ok:true});});
  app.use('/api',(req,res)=>fail(res,'Không tìm thấy API.',404));

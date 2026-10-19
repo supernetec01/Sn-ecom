@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -8,7 +9,7 @@ import { openStore, hashPassword } from '../store.js';
 import { createApp } from '../server.js';
 import { expireOrders, pointsBalance, sha, totpCode } from '../commerce-store.js';
 async function fixture(t){const dir=mkdtempSync(join(tmpdir(),'sn-commerce-')),db=openStore(dir),server=createApp(db).listen(0,'127.0.0.1');await once(server,'listening');const base=`http://127.0.0.1:${server.address().port}`;t.after(async()=>{await new Promise(r=>server.close(r));db.close();rmSync(dir,{recursive:true,force:true});});
- async function req(path,method='GET',body,ctx={}){const r=await fetch(base+'/api'+path,{method,headers:{origin:base,'content-type':'application/json',...(ctx.cookie?{cookie:ctx.cookie}:{}),...(ctx.csrf?{'x-csrf-token':ctx.csrf}:{}),...ctx.headers},body:body===undefined?undefined:JSON.stringify(body)});const content=r.headers.get('content-type');return {status:r.status,data:content?.includes('application/json')?await r.json():await r.text(),cookie:r.headers.get('set-cookie')?.split(';')[0]};}
+ async function req(path,method='GET',body,ctx={}){const r=await fetch(base+'/api'+path,{method,headers:{origin:base,'content-type':'application/json',...(path==='/orders'&&method==='POST'?{'Idempotency-Key':randomUUID()}:{}),...(ctx.cookie?{cookie:ctx.cookie}:{}),...(ctx.csrf?{'x-csrf-token':ctx.csrf}:{}),...ctx.headers},body:body===undefined?undefined:JSON.stringify(body)});const content=r.headers.get('content-type');return {status:r.status,data:content?.includes('application/json')?await r.json():await r.text(),cookie:r.headers.get('set-cookie')?.split(';')[0]};}
  const buyer=await req('/register','POST',{name:'Buyer',email:'buyer@test.example',password:'test-password-123'});db.prepare("INSERT INTO users(email,name,password,role) VALUES(?,?,?,'admin')").run('admin@test.example','Admin',hashPassword('admin-password-123'));const a=await req('/login','POST',{email:'admin@test.example',password:'admin-password-123'});return {db,base,req,buyer:{cookie:buyer.cookie,csrf:buyer.data.csrf},admin:{cookie:a.cookie,csrf:a.data.csrf}};}
 const shipping={country:'VN',province_code:'01',ward_code:'00004',recipient:'Buyer',address:'123 Test address',phone:'0901234567',payment:'cod'};
 test('Guest orders use private capability, isolate retries and restore stock exactly once',async t=>{const {db,req,buyer}=await fixture(t);const product=db.prepare('SELECT * FROM products LIMIT 1').get(),body={...shipping,email:'guest@test.example',items:[{id:product.id,quantity:2}]},ctx={headers:{'Idempotency-Key':'guest-test-request-12345'}};

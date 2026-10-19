@@ -1,4 +1,5 @@
 import { createHash, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
+import { productVariants, normalizeSku } from './catalog.js';
 export const sha = value => createHash('sha256').update(value).digest('hex');
 export const now = () => new Date().toISOString();
 export const moneyInt = (v,max=1e9) => Number.isSafeInteger(v)&&v>=0&&v<=max;
@@ -69,7 +70,14 @@ export function cancelOrder(db,o,actor,reason){
  event(db,o.id,actor,'cancelled',reason);notifyOrder(db,o,reason);
 }
 export function expireOrders(db){return transact(db,()=>{const rows=db.prepare("SELECT * FROM orders WHERE status='pending' AND payment_status='unpaid' AND expires IS NOT NULL AND expires<?").all(Date.now());for(const o of rows)cancelOrder(db,o,null,'Đơn hết thời hạn chờ xác nhận.');return rows.length;});}
-export function decorateProduct(db,p,read){const row=read(p);if(!row)return row;const variants=db.prepare('SELECT * FROM product_variants WHERE product_id=? AND active=1 ORDER BY id').all(p.id);return {...row,variants,...(variants.length?{price:Math.min(...variants.map(v=>v.price)),stock:variants.reduce((n,v)=>n+v.stock,0)}:{}),url:`/san-pham/${p.id}-${slug(p.name)}`};}
+export function decorateProduct(db,p,read){
+ const row=read(p);if(!row)return row;
+ const all=productVariants(db,p.id),variants=all.filter(v=>v.active===1).map(v=>({...v,sku:normalizeSku(v.sku)}));
+ // Inactive variants still establish the product's SKU model. Never restore the
+ // legacy parent stock when the last active choice is hidden.
+ const inventory=all.length?{price:Math.min(...(variants.length?variants:all).map(v=>v.price)),stock:variants.reduce((n,v)=>n+v.stock,0)}:{};
+ return {...row,has_variants:all.length>0,variants,...inventory,url:`/san-pham/${p.id}-${slug(p.name)}`};
+}
 export function readOrder(db,o){return {...o,guest_hash:undefined,items:JSON.parse(o.items),bank:JSON.parse(o.bank),shipment:db.prepare('SELECT * FROM shipments WHERE order_id=?').get(o.id)||null,returns:db.prepare('SELECT * FROM return_requests WHERE order_id=?').get(o.id)||null,history:db.prepare('SELECT kind,note,created FROM order_events WHERE order_id=? ORDER BY id').all(o.id),payments:db.prepare('SELECT kind,amount,reference,created FROM payment_transactions WHERE order_id=? ORDER BY id').all(o.id)};}
 // RFC 6238 TOTP (SHA-1, 30 seconds, six digits), with replay prevention at enrollment/login.
 const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';

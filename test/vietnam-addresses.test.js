@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
@@ -21,7 +22,7 @@ test('The pinned two-tier Vietnam dataset has 34 provinces and 3321 unique wards
 test('Shipping rejects foreign and mismatched locations, snapshots canonical names, and flags legacy saved addresses',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'sn-vn-'));const db=openStore(dir),server=createApp(db).listen(0,'127.0.0.1');await once(server,'listening');const base=`http://127.0.0.1:${server.address().port}`;
  t.after(async()=>{await new Promise(resolve=>server.close(resolve));db.close();rmSync(dir,{recursive:true,force:true});});
- let context={};async function request(path,method='GET',body){const r=await fetch(base+'/api'+path,{method,headers:{origin:base,'content-type':'application/json',...context},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};}
+ let context={};async function request(path,method='GET',body){const r=await fetch(base+'/api'+path,{method,headers:{origin:base,'content-type':'application/json',...(path==='/orders'&&method==='POST'?{'Idempotency-Key':randomUUID()}:{}),...context},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};}
  let result=await request('/locations/provinces');assert.equal(result.data.provinces.length,34);result=await request('/locations/provinces/79/wards');assert.ok(result.data.wards.length>0);const hcmWard=result.data.wards[0].code;assert.equal((await request('/locations/provinces/99/wards')).status,404);
  result=await request('/register','POST',{name:'Address test',email:'vn-address@example.test',password:'vn-address-password-123'});context={cookie:result.cookie,'x-csrf-token':result.data.csrf};const uid=result.data.user.id;
  const product=db.prepare('SELECT * FROM products LIMIT 1').get();const good={recipient:'Khách hàng',phone:'0901234567',country:'VN',province_code:'01',ward_code:'00004',address:'12 Nguyễn Du',payment:'cod',items:[{id:product.id,quantity:1}]};

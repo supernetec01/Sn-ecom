@@ -1,0 +1,61 @@
+name: Quality checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: API and regression tests
+            command: test
+            browser: false
+          - label: Chromium commerce smoke
+            command: test:browser
+            browser: true
+          - label: Chromium language smoke
+            command: test:languages
+            browser: true
+    env:
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Install the browser matching the locked Playwright version
+        if: matrix.browser
+        run: npx playwright install --with-deps chromium
+      - run: mkdir -p test-results
+      - name: Run ${{ matrix.label }}
+        run: npm run "${{ matrix.command }}"
+        env:
+          BROWSER_SCREENSHOT: ${{ github.workspace }}/test-results/commerce.png
+          LANGUAGE_SCREENSHOT: ${{ github.workspace }}/test-results/languages.png
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.browser
+        with:
+          name: ${{ matrix.label }}-screenshots
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  database:
+    name: PostgreSQL schema and concurrency
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash database/postgresql/verify.sh
