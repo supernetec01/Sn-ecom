@@ -411,7 +411,14 @@ function bind() {
   }
   if ($('#settings')) bindUploads($('#settings'));
   if ($('#search')) $('#search').onsubmit = event => { event.preventDefault(); query = new FormData(event.currentTarget).get('q').trim(); catalogPageNumber=1; location.hash = 'products'; render(); };
-  document.querySelectorAll('[data-category],[data-filter]').forEach(button => button.onclick = () => { category = button.dataset.category ?? button.dataset.filter; catalogPageNumber=1; if (location.hash !== '#products') location.hash = 'products'; else render(); });
+  document.querySelectorAll('[data-category],[data-filter]').forEach(button => button.onclick = () => {
+    category = button.dataset.category ?? button.dataset.filter;
+    catalogPageNumber = 1;
+    // Links navigate through their href; changing the hash here as well would
+    // add a second history entry before the product-link handler runs.
+    if (location.hash === '#products') render();
+    else if (!button.matches('a[href]')) location.hash = 'products';
+  });
   document.querySelectorAll('[data-add]').forEach(button => button.onclick = () => add(Number(button.dataset.add), 1, button));
   document.querySelectorAll('[data-policy]').forEach(button => button.onclick = () => { const policy = config.policies[Number(button.dataset.policy)]; modal(`<span class="eyebrow">${esc(config.brand)}</span><div data-original-content lang="vi"><h2>${esc(policy.title)}</h2><p class="policy">${esc(policy.body)}</p></div><p class="muted">Chính sách được giữ nguyên bằng tiếng Việt.</p>`); });
   document.querySelectorAll('[data-article]').forEach(button => button.onclick = () => { const article = editorial().journal.articles[Number(button.dataset.article)]; modal(`<img class="article-modal-image" src="${esc(article.image)}" alt="${esc(article.title)}"><span class="eyebrow">${esc(editorial().journal.eyebrow)}</span><h2>${esc(article.title)}</h2><p class="article-intro">${esc(article.excerpt)}</p><p class="policy">${esc(article.body)}</p>`); });
@@ -455,7 +462,20 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) void
 window.addEventListener('storage', event => { if (event.key === storeUpdateKey) void syncStorefront(); });
 setInterval(syncStorefront, 15000);
 window.addEventListener('popstate',()=>render());
-document.addEventListener('click',event=>{const a=event.target.closest('a');if(!a||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||a.target)return;const u=new URL(a.href,location.href);if(u.origin===location.origin&&u.pathname.startsWith('/san-pham/')){event.preventDefault();history.pushState({},'',u.pathname+u.search);render();window.scrollTo(0,0);}});
+document.addEventListener('click', event => {
+  const link = event.target.closest('a[href]');
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target || link.hasAttribute('download')) return;
+  const url = new URL(link.href, location.href);
+  if (url.origin !== location.origin || !url.pathname.startsWith('/san-pham/')) return;
+  // Fragment links inherit the product pathname. Route them from the storefront
+  // root, including href="#" which must open home rather than the same product.
+  if (link.getAttribute('href').startsWith('#')) url.pathname = '/';
+  event.preventDefault();
+  history.pushState({}, '', url.pathname + url.search + url.hash);
+  motion.closeDialog($('#modal'), { immediate: true });
+  render();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+});
 document.addEventListener('click', event => { if (!event.target.closest('.category-menu')) closeCategories(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && $('#category-toggle')?.getAttribute('aria-expanded') === 'true') closeCategories(true); });
 window.addEventListener('hashchange', () => { motion.closeDialog($('#modal'), { immediate: true }); render(); window.scrollTo({ top: 0, behavior: 'instant' }); });

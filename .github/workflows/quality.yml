@@ -29,6 +29,9 @@ jobs:
           - label: Chromium storefront sync
             command: test:storefront
             browser: true
+          - label: Chromium product navigation
+            command: test:navigation
+            browser: true
           - label: Chromium language smoke
             command: test:languages
             browser: true
@@ -51,6 +54,7 @@ jobs:
           BROWSER_SCREENSHOT: ${{ github.workspace }}/test-results/commerce.png
           ADMIN_SCREENSHOT: ${{ github.workspace }}/test-results/admin.png
           LANGUAGE_SCREENSHOT: ${{ github.workspace }}/test-results/languages.png
+          NAVIGATION_SCREENSHOT: ${{ github.workspace }}/test-results/navigation.png
       - uses: actions/upload-artifact@v4
         if: always() && matrix.browser
         with:

@@ -107,4 +107,4 @@ Số điện thoại được bỏ khoảng trắng, dấu ngoặc và dấu g�
 
 ## Kiểm thử tự động và sửa lỗi QA
 
-GitHub Actions chạy API/regression, Chromium mua hàng, đa ngôn ngữ và schema/concurrency PostgreSQL trên mỗi push/PR. Xem [bản sửa bốn lỗi QA và hợp đồng checkout](docs/qa-fixes-2026-10-19.md).
+GitHub Actions chạy API/regression, Chromium mua hàng, quản trị, đồng bộ danh mục, điều hướng, đa ngôn ngữ và schema/concurrency PostgreSQL trên mỗi push/PR. `npm run test:navigation` kiểm tra bấm link từ trang sản phẩm sang giỏ hàng/các tab, lịch sử trình duyệt và giữ dữ liệu. Xem [bản sửa lỗi kẹt điều hướng](docs/navigation-fix-2026-10-19.md) và [bản sửa bốn lỗi QA và hợp đồng checkout](docs/qa-fixes-2026-10-19.md).
