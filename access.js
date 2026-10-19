@@ -8,7 +8,7 @@ export const roles = {
   customer: { label: 'Khách hàng', description: 'Mua hàng và xem đơn của chính mình.', permissions: [] },
 };
 export const permissionsFor = role => [...(roles[role]?.permissions || [])];
-export const publicUser = user => ({ id: user.id ?? user.user_id, name: user.name, email: user.email, role: user.role, permissions: permissionsFor(user.role) });
+export const publicUser = user => ({ id: user.id ?? user.user_id, name: user.name, email: user.email, role: user.role, permissions: permissionsFor(user.role), mustChangePassword: Boolean(user.password_change_required) });
 export function audit(db, actorId, action, entity, entityId, details = {}) {
   appendAudit(db, actorId, action, entity, entityId, details);
 }
@@ -28,7 +28,7 @@ export function adminGate(req, res, next) {
     [/^(settings|config)(\/|$)/, req.method === 'PUT' ? ['settings.manage'] : ['content.manage', 'settings.manage']],
     [/^upload$/, ['products.manage', 'content.manage', 'settings.manage']],
     [/^(reviews|coupons)(\/|$)/, ['marketing.manage']],
-    [/^commerce$/, ['settings.manage']],
+    [/^(commerce|system)$/, ['settings.manage']],
     [/^users(\/|$)/, ['users.manage']],
     [/^audit$/, ['audit.read']],
     [/^outbox(\/|$)/, ['outbox.manage']],

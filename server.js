@@ -64,8 +64,14 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
    if(req.get('origin')!==expected)return fail(res,'Nguồn yêu cầu không hợp lệ.',403);
   }
   const cookie=req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('sn_session='))?.slice(11);
-  if(cookie&&/^[a-f0-9]{64}$/.test(cookie)){req.session=db.prepare('SELECT s.*,u.email,u.name,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE token=? AND expires>? AND u.disabled=0').get(digest(cookie),Date.now());}
+  if(cookie&&/^[a-f0-9]{64}$/.test(cookie)){req.session=db.prepare('SELECT s.*,u.email,u.name,u.role,u.password_change_required FROM sessions s JOIN users u ON u.id=s.user_id WHERE token=? AND expires>? AND u.disabled=0').get(digest(cookie),Date.now());}
   if(req.session)req.session.permissions=permissionsFor(req.session.role);
+  if (req.session?.password_change_required) {
+   const route=req.originalUrl.split('?')[0];
+   const accountAllowed=['/api/me','/api/account/password','/api/account/security','/api/logout','/api/login'];
+   const publicRead=req.method==='GET'&&/^\/api\/(settings$|products(?:\/|$)|catalog$|commerce$|collections\/|locations\/)/.test(route);
+   if (!accountAllowed.includes(route) && !publicRead) return res.status(403).json({error:'Vui lòng đổi mật khẩu do quản trị viên cấp trước khi tiếp tục.',code:'PASSWORD_CHANGE_REQUIRED'});
+  }
   next();
  });
  const auth=(req,res,next)=>req.session?next():fail(res,'Vui lòng đăng nhập.',401);

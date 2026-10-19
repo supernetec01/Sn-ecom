@@ -1,3 +1,4 @@
+import { systemStatus } from './system-status.js';
 import { roles, publicUser, audit, transaction } from './access.js';
 import { hashPassword } from './store.js';
 import { assertRevision } from './concurrency.js';
@@ -39,6 +40,7 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
       audit(db, req.session.user_id, 'product.visibility', 'product', req.params.id, { active: req.body.active });
     }); res.json({ ok: true });
   }));
+  app.get('/api/admin/system', permit('settings.manage'), (_req, res) => res.json(systemStatus(db)));
   app.get('/api/admin/dashboard', permit('dashboard.read'), (req, res) => {
     const product = db.prepare('SELECT COUNT(*) AS total,SUM(CASE WHEN stock<=5 THEN 1 ELSE 0 END) AS lowStock FROM products').get();
     const order = db.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending,COALESCE(SUM(CASE WHEN status='completed' THEN total ELSE 0 END),0) AS revenue FROM orders").get();
@@ -91,24 +93,26 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
   }));
 
   app.get('/api/admin/users', permit('users.manage'), (req, res) => {
-    const q = String(req.query.q || '').slice(0, 200), role = String(req.query.role || ''), status = String(req.query.status || '');
+    const q = String(req.query.q || '').slice(0, 200), role = String(req.query.role || ''), status = String(req.query.status || ''), scope = String(req.query.scope || '');
     const page = Math.min(100000, Math.max(1, Number.parseInt(req.query.page, 10) || 1)), pageSize = 20;
     const where = ["role!='guest'"], args = [];
+    if (scope === 'staff') where.push("role!='customer'");
+    if (scope === 'customers') where.push("role='customer'");
     if (q) { where.push('(name LIKE ? ESCAPE \'\\\' OR email LIKE ? ESCAPE \'\\\')'); const pattern = '%' + q.replace(/[\\%_]/g, value => '\\' + value) + '%'; args.push(pattern, pattern); }
     if (Object.hasOwn(roles, role)) { where.push('role=?'); args.push(role); }
     if (['active', 'disabled'].includes(status)) { where.push('disabled=?'); args.push(status === 'disabled' ? 1 : 0); }
     const clause = where.length ? ' WHERE ' + where.join(' AND ') : '';
     const total = db.prepare('SELECT COUNT(*) AS count FROM users' + clause).get(...args).count;
-    const items = db.prepare('SELECT id,name,email,role,disabled FROM users' + clause + ' ORDER BY id DESC LIMIT ? OFFSET ?').all(...args, pageSize, (page - 1) * pageSize);
+    const items = db.prepare('SELECT id,name,email,role,disabled,password_change_required FROM users' + clause + ' ORDER BY id DESC LIMIT ? OFFSET ?').all(...args, pageSize, (page - 1) * pageSize);
     res.json({ items, total, page, pageSize, roles });
   });
   app.post('/api/admin/users', csrf, permit('users.manage'), safely((req, res) => {
     const { name, email, password, role } = req.body;
     if (!exact(req.body, ['name', 'email', 'password', 'role']) || !text(name, 100) || !name.trim() || !emailValid(email) || !text(password, 128) || password.length < 12 || !Object.hasOwn(roles, role)) return fail(res, 'Nhập họ tên, email hợp lệ, mật khẩu 12–128 ký tự và vai trò.');
     const user = transaction(db, () => {
-      const id = Number(db.prepare('INSERT INTO users(name,email,password,role) VALUES(?,?,?,?)').run(name.trim(), email.trim().toLowerCase(), hashPassword(password), role).lastInsertRowid);
+      const id = Number(db.prepare('INSERT INTO users(name,email,password,role,password_change_required) VALUES(?,?,?,?,?)').run(name.trim(), email.trim().toLowerCase(), hashPassword(password), role, role === 'customer' ? 0 : 1).lastInsertRowid);
       audit(db, req.session.user_id, 'user.create', 'user', id, { role });
-      return publicUser(db.prepare('SELECT id,name,email,role FROM users WHERE id=?').get(id));
+      return publicUser(db.prepare('SELECT id,name,email,role,password_change_required FROM users WHERE id=?').get(id));
     }); res.status(201).json(user);
   }));
   app.patch('/api/admin/users/:id', csrf, permit('users.manage'), safely((req, res) => {
@@ -134,8 +138,9 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
     const id = Number(req.params.id);
     if (id === req.session.user_id) return fail(res, 'Dùng mục Đổi mật khẩu để xác nhận mật khẩu hiện tại của bạn.');
     transaction(db, () => {
-      if (!db.prepare("SELECT id FROM users WHERE id=? AND role!='guest'").get(id)) reject('Không tìm thấy tài khoản.', 404);
-      db.prepare('UPDATE users SET password=? WHERE id=?').run(hashPassword(password), id);
+      const target = db.prepare("SELECT id,role FROM users WHERE id=? AND role!='guest'").get(id);
+      if (!target) reject('Không tìm thấy tài khoản.', 404);
+      db.prepare('UPDATE users SET password=?,password_change_required=? WHERE id=?').run(hashPassword(password), target.role === 'customer' ? 0 : 1, id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
       db.prepare("DELETE FROM account_tokens WHERE user_id=? AND kind='reset'").run(id);
       audit(db, req.session.user_id, 'user.password_reset', 'user', id);

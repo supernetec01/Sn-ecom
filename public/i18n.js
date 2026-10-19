@@ -12,7 +12,7 @@ const translatedCopy = {en:new Map(), 'zh-TW':new Map()};
 const textSources = new WeakMap(), attributeSources = new WeakMap();
 const responses = new Map();
 let context, sequence = 0, controller, scheduled = false, mode = 'source';
-const privateRoute = route => /^(account|order\/|profile|manage|admin|forgot|reset\/|verify\/)/.test(route);
+const privateRoute = route => /^(account|change-password|order\/|profile|manage|admin|forgot|reset\/|verify\/)/.test(route);
 const editorRoute = route => route === 'admin' || route.startsWith('admin/') || route.startsWith('manage');
 
 export const currentLanguage = () => language;

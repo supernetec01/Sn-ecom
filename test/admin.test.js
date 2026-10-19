@@ -151,13 +151,16 @@ test('Additive admin migration preserves previous accounts, sessions and setting
     const users = db.prepare('SELECT id,name,email,password,role FROM users').all();
     db.close();
     db = new DatabaseSync(join(dir, 'store.sqlite'));
-    db.exec('ALTER TABLE users DROP COLUMN disabled; ALTER TABLE settings DROP COLUMN revision;'); db.close();
+    db.exec('ALTER TABLE users DROP COLUMN disabled; ALTER TABLE users DROP COLUMN password_change_required; ALTER TABLE settings DROP COLUMN revision;'); db.close();
     db = openStore(dir);
     assert.deepEqual(db.prepare('SELECT id,name,email,password,role FROM users').all(), users);
     assert.equal(db.prepare('SELECT disabled FROM users').get().disabled, 0);
+    assert.equal(db.prepare('SELECT password_change_required FROM users').get().password_change_required, 0);
     assert.equal(db.prepare('SELECT revision FROM settings').get().revision, 0);
     assert.equal(db.prepare('SELECT value FROM settings').get().value, settings);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM audit_log').get().count, 0);
+    db.prepare('UPDATE users SET password_change_required=1').run();db.close();db=openStore(dir);
+    assert.equal(db.prepare('SELECT password_change_required FROM users').get().password_change_required, 1);
   } finally { db?.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -198,12 +201,95 @@ test('New password dialog contract preserves MFA and cannot bypass a second fact
   const f = await fixture(); const { request, login, db, ids, password } = f;
   try {
     const ctx = await login('admin'), secret = totpSecret(), next = randomBytes(20).toString('hex');
-    db.prepare('UPDATE users SET totp_secret=? WHERE id=?').run(secret, ids.admin);
+    db.prepare('UPDATE users SET totp_secret=?,password_change_required=1 WHERE id=?').run(secret, ids.admin);
     assert.equal((await request('/account/password', { ...ctx, method: 'POST', body: { currentPassword: password, newPassword: next } })).status, 401);
+    assert.equal(db.prepare('SELECT password_change_required FROM users WHERE id=?').get(ids.admin).password_change_required,1);
     assert.ok(checkPassword(password, db.prepare('SELECT password FROM users WHERE id=?').get(ids.admin).password));
     assert.equal((await request('/account/password', { ...ctx, method: 'POST', body: { currentPassword: password, newPassword: next, otp: totpCode(secret) } })).status, 200);
     assert.equal((await request('/admin/dashboard', ctx)).status, 401);
     assert.equal(db.prepare('SELECT totp_secret FROM users WHERE id=?').get(ids.admin).totp_secret, secret);
+    assert.equal(db.prepare('SELECT password_change_required FROM users WHERE id=?').get(ids.admin).password_change_required,0);
     assert.equal((await request('/login', { method: 'POST', body: { email: 'admin@example.test', password: next } })).status, 401);
+  } finally { await f.close(); }
+});
+
+test('Admin-issued staff passwords require a private password before any staff or account work', async () => {
+  const f = await fixture(); const { request, login, db } = f;
+  try {
+    const admin = await login('admin'), initial = randomBytes(20).toString('hex'), own = randomBytes(20).toString('hex');
+    const created = await request('/admin/users', { ...admin, method:'POST', body:{name:'Issued staff',email:'issued@example.test',password:initial,role:'sales'} });
+    assert.equal(created.status,201); assert.equal(created.data.mustChangePassword,true);
+    const signIn = async password => request('/login',{method:'POST',body:{email:'issued@example.test',password}});
+    let signed = await signIn(initial); assert.equal(signed.status,200); assert.equal(signed.data.user.mustChangePassword,true);
+    const staff = { cookie:signed.cookie, csrf:signed.data.csrf };
+    for (const [path,method,body] of [
+      ['/admin/orders','GET'],['/admin/users','GET'],['/orders','GET'],['/admin/orders/1','PATCH',{status:'confirmed'}],
+      ['/account/profile','POST',{name:'Bypass',mustChangePassword:false}],['/addresses','GET'],['/checkout/quote','POST',{}],
+    ]) {
+      const result = await request(path,{...staff,method,body}); assert.equal(result.status,403,path); assert.equal(result.data.code,'PASSWORD_CHANGE_REQUIRED',path);
+    }
+    assert.equal((await request('/settings',staff)).status,200);
+    assert.equal((await request('/me',staff)).data.user.mustChangePassword,true);
+    assert.equal((await request('/account/password',{cookie:staff.cookie,method:'POST',body:{currentPassword:initial,newPassword:own}})).status,403);
+    assert.equal((await request('/account/password',{...staff,method:'POST',body:{currentPassword:'wrong',newPassword:own}})).status,401);
+    assert.equal((await request('/account/password',{...staff,method:'POST',body:{currentPassword:initial,newPassword:initial}})).status,400);
+    assert.equal(db.prepare('SELECT password_change_required FROM users WHERE id=?').get(created.data.id).password_change_required,1);
+    assert.equal((await request('/account/password',{...staff,method:'POST',body:{currentPassword:initial,newPassword:own}})).status,200);
+    assert.equal((await request('/admin/orders',staff)).status,401);
+    assert.equal((await signIn(initial)).status,401);
+    signed = await signIn(own); assert.equal(signed.data.user.mustChangePassword,false);
+    const active = {cookie:signed.cookie,csrf:signed.data.csrf};
+    assert.equal((await request('/admin/orders',active)).status,200);
+    assert.equal((await request('/admin/users',active)).status,403);
+    const temporary = randomBytes(20).toString('hex');
+    assert.equal((await request('/admin/users/'+created.data.id+'/password',{...admin,method:'POST',body:{password:temporary}})).status,200);
+    assert.equal((await request('/admin/orders',active)).status,401);
+    signed = await signIn(temporary); assert.equal(signed.data.user.mustChangePassword,true);
+    assert.equal((await request('/admin/orders',{cookie:signed.cookie})).data.code,'PASSWORD_CHANGE_REQUIRED');
+    const rows = (await request('/admin/users?scope=staff',admin)).data.items;
+    assert.ok(rows.every(user=>!['customer','guest'].includes(user.role)));
+    assert.equal(rows.find(user=>user.id===created.data.id).password_change_required,1);
+    assert.ok((await request('/admin/users?scope=customers',admin)).data.items.every(user=>user.role==='customer'));
+  } finally { await f.close(); }
+});
+
+test('Password recovery clears temporary status and a failed password audit rolls back all changes', async () => {
+  const f = await fixture(); const { request, login, db, ids, password } = f;
+  const { sha } = await import('../commerce-store.js');
+  try {
+    db.prepare('UPDATE users SET password_change_required=1 WHERE id=?').run(ids.manager);
+    const ctx = await login('manager'), next = randomBytes(20).toString('hex');
+    db.exec("CREATE TRIGGER fail_password_audit BEFORE INSERT ON audit_log WHEN NEW.action='password_changed' BEGIN SELECT RAISE(ABORT,'test'); END");
+    assert.equal((await request('/account/password',{...ctx,method:'POST',body:{currentPassword:password,newPassword:next}})).status,500);
+    const row=db.prepare('SELECT password,password_change_required FROM users WHERE id=?').get(ids.manager);
+    assert.ok(checkPassword(password,row.password));assert.equal(row.password_change_required,1);
+    assert.ok((await request('/me',ctx)).data.user);
+    db.exec('DROP TRIGGER fail_password_audit');
+    const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO account_tokens VALUES(?,?,?,?)').run(sha(token),ids.manager,'reset',Date.now()+60000);
+    assert.equal((await request('/account/reset',{method:'POST',body:{token,password}})).status,400);
+    assert.equal((await request('/account/reset',{method:'POST',body:{token,password:next}})).status,200);
+    assert.equal(db.prepare('SELECT password_change_required FROM users WHERE id=?').get(ids.manager).password_change_required,0);
+    assert.equal((await request('/admin/orders',ctx)).status,401);
+    const fresh=await login('manager',next);assert.equal((await request('/admin/orders',fresh)).status,200);
+  } finally { await f.close(); }
+});
+
+test('Feature readiness separates empty data, configuration, disabled programs and missing integrations without exposing secrets', async () => {
+  const f = await fixture(); const { request, login, db } = f;
+  const { systemStatus } = await import('../system-status.js');
+  try {
+    assert.equal((await request('/admin/system')).status,401);
+    for(const role of ['manager','editor','customer'])assert.equal((await request('/admin/system',await login(role))).status,403);
+    const result=await request('/admin/system',await login('admin'));assert.equal(result.status,200);assert.equal(result.data.providerConnectionsChecked,false);
+    const snapshot=()=>({users:db.prepare('SELECT * FROM users').all(),settings:db.prepare('SELECT * FROM settings').all(),orders:db.prepare('SELECT * FROM orders').all(),outbox:db.prepare('SELECT * FROM notification_outbox').all()});
+    const before=snapshot(),empty=systemStatus(db,{}), byId=Object.fromEntries(empty.features.map(feature=>[feature.id,feature]));
+    assert.equal(byId.orders.state,'empty'); assert.equal(byId.reviews.state,'empty'); assert.equal(byId.rewards.state,'disabled');
+    assert.equal(byId.pages.state,'content_only');assert.equal(byId.wallets.state,'not_implemented');assert.equal(byId.email.state,'needs_configuration');
+    assert.equal(byId.assistant.state,'fallback');assert.equal(byId.translation.state,'fallback');
+    const secret=randomBytes(32).toString('hex');
+    const configured=systemStatus(db,{EMAIL_API_KEY:secret,EMAIL_FROM:'sender@example.test',APP_ORIGIN:'https://shop.example.test',VNPAY_TMN_CODE:secret,VNPAY_HASH_SECRET:secret,AI_API_KEY:secret,AI_MODEL:'model',TRANSLATION_API_KEY:secret});
+    for(const id of ['email','vnpay','assistant','translation'])assert.equal(configured.features.find(f=>f.id===id).state,'configured');
+    assert.ok(!JSON.stringify(configured).includes(secret));assert.ok(!JSON.stringify(configured).includes('sender@example.test'));
+    assert.deepEqual(snapshot(),before);
   } finally { await f.close(); }
 });

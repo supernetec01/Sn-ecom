@@ -39,8 +39,9 @@ async function field(p,keys) { return p.locator('[data-config]').all().then(asyn
 async function saved(p,click) { const response = p.waitForResponse(r=>r.url().endsWith('/api/admin/settings')&&r.request().method()==='PATCH'); await click(); assert.equal((await response).status(),200); await p.waitForFunction(()=>document.querySelector('[data-save-state]')?.textContent==='Chưa có thay đổi'); }
 try {
   const p = await login('admin'); await p.goto(base+'/#admin'); await p.locator('.admin-stats').first().waitFor();
-  assert.equal(await p.locator('.admin-sidebar nav a').count(),14);
+  assert.equal(await p.locator('.admin-sidebar nav a').count(),15);
   await p.screenshot({path:join(dir,'admin-overview.png'),fullPage:true});
+  await tab(p,'system'); await p.locator('[data-feature=staff]').waitFor(); await p.locator('[data-feature=wallets]').getByText('Chưa tích hợp',{exact:true}).waitFor();
   await tab(p,'products'); await p.locator('[data-product-new]').click();
   await p.locator('#product-form [name=name]').fill('Sản phẩm quản trị'); await p.locator('#product-form [name=price]').fill('135000'); await p.locator('#product-form [name=stock]').fill('32'); await p.locator('#product-form [name=active]').selectOption('1');
   await p.locator('#product-form [data-upload]').setInputFiles(fileURLToPath(new URL('../public/logo.png', import.meta.url))); await p.waitForFunction(()=>document.querySelector('#product-form [name=image]').value.startsWith('/uploads/'));
@@ -121,11 +122,14 @@ try {
   await content(p,'brand'); await (await field(p,['brand'])).fill('Chưa lưu'); p.once('dialog',d=>d.dismiss()); await p.locator('[data-admin-nav=users]').click(); assert.equal(await (await field(p,['brand'])).inputValue(),'Chưa lưu');
   p.once('dialog',d=>d.accept()); await tab(p,'users'); await p.locator('[data-user-new]').click(); await p.locator('#user-form [name=name]').fill('Nhân viên kiểm tra'); await p.locator('#user-form [name=email]').fill('new-staff@example.test'); await p.locator('#user-form [name=password]').fill(password); await p.locator('#user-form [name=role]').selectOption('manager'); await p.locator('#user-form button.primary').click(); await p.getByText('new-staff@example.test',{exact:true}).waitFor();
   const staffId=db.prepare('SELECT id FROM users WHERE email=?').get('new-staff@example.test').id;
+  await p.locator('[data-user-scope=customers]').click();await p.getByText('customer@example.test',{exact:true}).waitFor();assert.equal(await p.locator('[data-user-edit="'+staffId+'"]').count(),0);
+  await p.locator('[data-user-scope=staff]').click();await p.getByText('new-staff@example.test',{exact:true}).waitFor();
+
   await p.locator('[data-user-edit="'+staffId+'"]').click(); await p.locator('#user-form [name=role]').selectOption('editor'); await p.locator('#user-form [name=disabled]').selectOption('true'); await p.locator('#user-form button.primary').click(); await p.getByText('new-staff@example.test',{exact:true}).waitFor();
   await p.locator('[data-user-password="'+staffId+'"]').click(); await p.locator('#reset-password input').fill(randomBytes(20).toString('hex')); await p.locator('#reset-password button').click(); await p.locator('#reset-password').waitFor({state:'hidden'});
   await p.locator('[data-user-edit="'+db.prepare("SELECT id FROM users WHERE role='admin'").get().id+'"]').click(); assert.equal(await p.locator('#user-form [name=role]').isDisabled(),true); assert.equal(await p.locator('#user-form [name=disabled]').isDisabled(),true); await p.locator('.modal-close').click();
   await p.screenshot({path:process.env.ADMIN_SCREENSHOT || join(dir,'admin-users.png'),fullPage:true});
-  for (const width of [375,768]) { await p.setViewportSize({width,height:900}); for(const t of ['overview','products','categories','orders','content','sales','users','audit','inventory','coupons','reviews','returns','commerce','outbox']) { await tab(p,t); assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${width} overflow ${t}`); } }
+  for (const width of [375,768]) { await p.setViewportSize({width,height:900}); for(const t of ['overview','products','categories','orders','content','sales','users','audit','inventory','coupons','reviews','returns','commerce','outbox','system']) { await tab(p,t); assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${width} overflow ${t}`); } }
   await p.screenshot({path:join(dir,'admin-mobile.png'),fullPage:true});
   const manager=await login('manager'); await manager.goto(base+'/#admin'); await manager.locator('.admin-sidebar').waitFor(); assert.equal(await manager.locator('.admin-sidebar nav a').count(),8); await manager.goto(base+'/#admin/users'); await manager.getByRole('heading',{name:'Không có quyền truy cập'}).waitFor();
   const editor=await login('editor'); await editor.goto(base+'/#admin'); await editor.locator('#admin-config').waitFor(); assert.equal(await editor.locator('.admin-sidebar nav a').count(),3); assert.equal(await editor.locator('[data-admin-nav=sales]').count(),0);

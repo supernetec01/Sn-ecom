@@ -95,6 +95,9 @@ async function api(url, options = {}) {
   const response = await fetch('/api' + url, { ...options, headers: { 'Content-Type': 'application/json', ...(me.csrf ? { 'X-CSRF-Token': me.csrf } : {}), ...options.headers }, body: options.body ? JSON.stringify(options.body) : undefined });
   const data = await response.json();
   if (!response.ok) {
+    if (data.code === 'PASSWORD_CHANGE_REQUIRED' && me.user) {
+      me.user.mustChangePassword = true; void motion.closeDialog($('#modal')); location.hash = 'change-password';
+    }
     if (response.status === 401 && url.startsWith('/admin')) {
       me = { user: null }; motion.closeDialog($('#modal')); location.hash = 'account';
     }
@@ -302,7 +305,8 @@ let generation = 0, lastRenderedRoute, catalogPageNumber=1;
 async function render({ settings } = {}) {
   const current = ++generation;
   try {
-    const route = location.hash.slice(1) || (location.pathname.startsWith('/san-pham/') ? 'product/'+Number(location.pathname.split('/')[2].split('-')[0]) : '');
+    let route = location.hash.slice(1) || (location.pathname.startsWith('/san-pham/') ? 'product/'+Number(location.pathname.split('/')[2].split('-')[0]) : '');
+    if (me.user?.mustChangePassword) { route = 'change-password'; if (location.hash !== '#change-password') history.replaceState(null, '', '#change-password'); }
     if (isStorefront(route)) {
       const next = settings || await readStoreSettings();
       if (current !== generation) return;
@@ -316,7 +320,7 @@ async function render({ settings } = {}) {
       if (category && !config.categories.includes(category)) { category = ''; catalogPageNumber = 1; }
     }
     if(route.startsWith('product/')) { try { const item=await api('/products/'+Number(route.split('/')[1]));products=products.filter(p=>p.id!==item.id).concat(item); } catch {} }
-    const extra = route.startsWith('manage') ? await adminUI.page(({commerce:'commerce',inventory:'inventory'}[route.split('/')[1]] || route.split('/')[1] || 'overview').split('?')[0]) : await extraPage(route, commerceContext());
+    const extra = route === 'change-password' ? requiredPasswordPage() : route.startsWith('manage') ? await adminUI.page(({commerce:'commerce',inventory:'inventory'}[route.split('/')[1]] || route.split('/')[1] || 'overview').split('?')[0]) : await extraPage(route, commerceContext());
     const body = extra ?? (route === 'cart' ? cartPage() : route === 'account' ? await accountPage() : (route === 'admin' || route.startsWith('admin/')) ? await adminUI.page(route.split('/')[1] || '') : route === 'products' ? await catalog() : route.startsWith('collection/') || route.startsWith('page/') ? await navigationPage(route.split('/')[1]) : route.startsWith('product/') ? productPage(Number(route.split('/')[1])) : route === 'inspiration' ? `<main class="wrap page">${journalSection()}</main>` : home());
     if (current !== generation) return;
     const activeProduct = route.startsWith('product/') && products.find(item => item.id === Number(route.split('/')[1]));
@@ -358,6 +362,7 @@ function bindUploads(root) {
   });
 }
 function bind() {
+  if ($('#required-password')) bindPasswordForm($('#required-password'));
   if ($('#category-toggle')) {
     const toggle = $('#category-toggle'), panel = $('#category-panel'), menu = toggle.closest('.category-menu');
     const canHover = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
@@ -446,14 +451,25 @@ async function logoutSession() {
   try { await api('/logout', { method: 'POST' }); me = { user: null }; location.hash = 'account'; await render(); }
   catch (error) { toast(error.message); }
 }
-function changePassword() {
-  modal(`<h2>Đổi mật khẩu</h2><p>Mật khẩu mới cần từ 12 ký tự. Sau khi đổi, bạn sẽ đăng nhập lại trên các thiết bị.</p><form class="form" id="change-password"><label>Mật khẩu hiện tại<input type="password" name="currentPassword" required maxlength="128" autocomplete="current-password"></label><label>Mật khẩu mới<input type="password" name="newPassword" required minlength="12" maxlength="128" autocomplete="new-password"></label><label>Nhập lại mật khẩu mới<input type="password" name="confirmPassword" required minlength="12" maxlength="128" autocomplete="new-password"></label><label>Mã xác thực hai bước (nếu đã bật)<input name="otp" autocomplete="one-time-code" maxlength="16"></label><p class="error" role="alert"></p><button class="primary">Đổi mật khẩu</button></form>`);
-  const form = $('#change-password'); form.onsubmit = event => { event.preventDefault(); submit(form, async () => {
+function passwordFields() {
+  return `<label>Mật khẩu hiện tại<input type="password" name="currentPassword" required maxlength="128" autocomplete="current-password"></label><label>Mật khẩu mới<input type="password" name="newPassword" required minlength="12" maxlength="128" autocomplete="new-password"></label><label>Nhập lại mật khẩu mới<input type="password" name="confirmPassword" required minlength="12" maxlength="128" autocomplete="new-password"></label><label>Mã xác thực hai bước (nếu đã bật)<input name="otp" autocomplete="one-time-code" maxlength="16"></label><p class="error" role="alert"></p><button class="primary">Đổi mật khẩu</button>`;
+}
+function requiredPasswordPage() {
+  if (!me.user) return authPage();
+  return `<main class="wrap page narrow"><h1>Đặt mật khẩu riêng</h1><p>Xin chào ${esc(me.user.name)}. Hãy thay mật khẩu do quản trị viên cấp bằng mật khẩu riêng trước khi sử dụng tài khoản. Mật khẩu mới cần từ 12–128 ký tự.</p><form class="form" id="required-password">${passwordFields()}</form><button class="text-link" id="logout">Đăng xuất</button></main>`;
+}
+function bindPasswordForm(form) {
+  form.onsubmit = event => { event.preventDefault(); submit(form, async () => {
     if (form.elements.newPassword.value !== form.elements.confirmPassword.value) throw Error('Hai mật khẩu mới chưa trùng nhau.');
     await api('/account/password', { method: 'POST', body: { currentPassword: form.elements.currentPassword.value, newPassword: form.elements.newPassword.value, otp: form.elements.otp.value } });
     await motion.closeDialog($('#modal')); me = { user: null }; location.hash = 'account'; await render(); toast('Đã đổi mật khẩu. Vui lòng đăng nhập lại.');
   }); };
 }
+function changePassword() {
+  modal(`<h2>Đổi mật khẩu</h2><p>Mật khẩu mới cần từ 12 ký tự. Sau khi đổi, bạn sẽ đăng nhập lại trên các thiết bị.</p><form class="form" id="change-password">${passwordFields()}</form>`);
+  bindPasswordForm($('#change-password'));
+}
+
 const adminUI = createAdminUI({ api, esc, money, icon, modal, submit, statusNames, editProduct, orderCard, orderManage: o => orderManage(o, commerceContext()), commercePage: section => extraPage('manage/' + section, { ...commerceContext(), adminEmbedded: true }), enhanceModal: () => enhanceCommerce({ ...commerceContext(), refresh: async () => { await motion.closeDialog($('#modal')); await refresh(); } }), getUser: () => me.user, getConfig: () => config, getCsrf: () => me.csrf, products: () => products, refresh, render, reloadUser, logout: logoutSession, changePassword, toast, closeModal: () => motion.closeDialog($('#modal')) });
 window.addEventListener('beforeunload', event => { if (adminUI.isDirty()) { event.preventDefault(); event.returnValue = ''; } });
 motion.installDialog($('#modal'));

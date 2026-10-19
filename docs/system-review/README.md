@@ -1,5 +1,7 @@
 # Đối chiếu hệ thống Super Net với ba tài liệu yêu cầu
 
+> Đây là báo cáo lịch sử tại commit `282d1b2`. Nhiều phát hiện đã được sửa ở các commit sau. Xem [rà soát chức năng hiện tại](../feature-audit.md), [hướng dẫn admin](../admin-guide.md) và [sửa nhất quán dữ liệu](../admin-qa-fixes-2026-10-19.md) trước khi dùng báo cáo này để đánh giá bản đang chạy.
+
 Ngày rà soát: 19/10/2026. Mã nguồn: `282d1b2c1b01fdbfec126e9432ba1396cfb26ddc`.
 
 Ba tệp dán được đọc theo thứ tự người dùng gửi: (1) danh sách chức năng website chuyên nghiệp, (2) 228 use case, (3) thiết kế dữ liệu và bảo mật. Tài liệu 3 nhắc đến SQL 46 bảng nhưng tệp SQL đó không nằm trong các tệp đính kèm; schema mới trong repository được xây dựng từ yêu cầu và mã thực tế.
