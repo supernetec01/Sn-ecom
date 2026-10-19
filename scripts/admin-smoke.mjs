@@ -43,7 +43,7 @@ try {
   await p.screenshot({path:join(dir,'admin-overview.png'),fullPage:true});
   await tab(p,'system'); await p.locator('[data-feature=staff]').waitFor(); await p.locator('[data-feature=wallets]').getByText('Chưa tích hợp',{exact:true}).waitFor();
   await tab(p,'products'); await p.locator('[data-product-new]').click();
-  await p.locator('#product-form [name=name]').fill('Sản phẩm quản trị'); await p.locator('#product-form [name=price]').fill('135000'); await p.locator('#product-form [name=stock]').fill('32'); await p.locator('#product-form [name=active]').selectOption('1');
+  await p.locator('#product-form [name=name]').fill('Sản phẩm quản trị'); await p.locator('#product-form [name=detail_sku]').fill('ADMIN-QA-SKU'); await p.locator('#product-form [name=price]').fill('135000'); await p.locator('#product-form [name=stock]').fill('32'); await p.locator('#product-form [name=active]').selectOption('1');
   await p.locator('#product-form [data-upload]').setInputFiles(fileURLToPath(new URL('../public/logo.png', import.meta.url))); await p.waitForFunction(()=>document.querySelector('#product-form [name=image]').value.startsWith('/uploads/'));
   await p.locator('#product-form button.primary').click(); await p.getByText('Sản phẩm quản trị',{exact:true}).waitFor();
   await p.locator('#admin-query').fill('Sản phẩm quản trị'); await p.locator('#admin-search button[type=submit]').click(); await p.waitForFunction(()=>document.querySelectorAll('.admin-table tbody tr').length===1);

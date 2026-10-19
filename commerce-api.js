@@ -1,3 +1,4 @@
+import { skuImage } from './sku-options.js';
 import { assertRevision, csvRevision } from './concurrency.js';
 import { roles } from './access.js';
 import { assertSkuAvailable, normalizeSku, productVariants } from './catalog.js';
@@ -41,7 +42,7 @@ export function installCommerce(app,db,{auth,csrf,admin,settings,loginLimit}) {
   for(const item of items){requireValue(item&&positive(item.id)&&positive(item.quantity)&&item.quantity<=99&&(item.variant_id===undefined||positive(item.variant_id)),'Giỏ hàng không hợp lệ.');const key=`${item.id}:${item.variant_id||0}`;requireValue(!seen.has(key),'Giỏ hàng có dòng trùng.');seen.add(key);
    const p=db.prepare('SELECT * FROM products WHERE id=? AND active=1').get(item.id);requireValue(p,'Sản phẩm không còn bán.');const variants=productVariants(db,p.id);const variant=item.variant_id?variants.find(v=>v.id===item.variant_id&&v.active===1):null;
    requireValue(!variants.length&&!item.variant_id||variant,'Vui lòng chọn đúng phiên bản sản phẩm.');const inventory=variant||p;requireValue(inventory.stock>=item.quantity,'Sản phẩm không còn đủ tồn kho.');
-   const info=JSON.parse(p.details||'{}');const line={id:p.id,name:p.name,price:inventory.price,quantity:item.quantity,...(variant?{variant_id:variant.id,variant:variant.label,sku:normalizeSku(variant.sku)}:{sku:normalizeSku(info.sku)})};lines.push(line);subtotal+=line.price*line.quantity;
+   const info=JSON.parse(p.details||'{}');const line={id:p.id,name:p.name,image:variant?.image||p.image,price:inventory.price,quantity:item.quantity,...(variant?{variant_id:variant.id,variant:variant.label,sku:normalizeSku(variant.sku)}:{sku:normalizeSku(info.sku)})};lines.push(line);subtotal+=line.price*line.quantity;
   }
   requireValue(payment!=='vnpay'||paymentConfigured(),'Thanh toán trực tuyến chưa được cấu hình.');
   const coupon=typeof body.coupon==='string'?body.coupon.trim().toUpperCase():'';requireValue(text(coupon,40),'Mã giảm giá không hợp lệ.');let discount=0;
@@ -162,20 +163,21 @@ export function installCommerce(app,db,{auth,csrf,admin,settings,loginLimit}) {
  app.get('/api/admin/inventory',(req,res)=>res.json(db.prepare('SELECT m.*,p.name,v.label variant FROM inventory_movements m LEFT JOIN products p ON p.id=m.product_id LEFT JOIN product_variants v ON v.id=m.variant_id ORDER BY m.id DESC LIMIT 300').all()));
  app.post('/api/admin/inventory',csrf,write((req,res)=>{const b=req.body;requireValue(positive(b.product_id)&&Number.isSafeInteger(b.delta)&&b.delta!==0&&Math.abs(b.delta)<=1e6&&text(b.reason,500)&&b.reason.trim().length>=3,'Nhập sản phẩm, lượng điều chỉnh và lý do.');transact(db,()=>{const p=b.variant_id?db.prepare('SELECT * FROM product_variants WHERE id=? AND product_id=?').get(b.variant_id,b.product_id):db.prepare('SELECT * FROM products WHERE id=?').get(b.product_id);requireValue(p&&p.stock+b.delta>=0,'Sản phẩm không tồn tại hoặc tồn kho không đủ.');requireValue(b.variant_id||!db.prepare('SELECT id FROM product_variants WHERE product_id=?').get(b.product_id),'Điều chỉnh tồn kho theo từng biến thể.');db.prepare(b.variant_id?'UPDATE product_variants SET stock=stock+? WHERE id=?':'UPDATE products SET stock=stock+? WHERE id=?').run(b.delta,p.id);movement(db,b.product_id,b.variant_id,b.delta,b.reason.trim(),null,req.session.user_id);recordAudit(req,'stock',b.product_id,b.reason.trim());});res.json({ok:true});}));
  app.get('/api/admin/products/:id/variants',(req,res)=>res.json(db.prepare('SELECT * FROM product_variants WHERE product_id=? ORDER BY id').all(req.params.id)));
- app.post('/api/admin/products/:id/variants',csrf,write((req,res)=>{const b=req.body;requireValue(text(b.sku,100)&&b.sku.trim()&&text(b.label,200)&&b.label.trim()&&moneyInt(b.price)&&moneyInt(b.stock,1e6),'Biến thể không hợp lệ.');const id=transact(db,()=>{requireValue(db.prepare('SELECT id FROM products WHERE id=?').get(req.params.id),'Không tìm thấy sản phẩm.');assertSkuAvailable(db,b.sku);const id=Number(db.prepare('INSERT INTO product_variants(product_id,sku,label,price,stock) VALUES(?,?,?,?,?)').run(req.params.id,normalizeSku(b.sku),b.label.trim(),b.price,b.stock).lastInsertRowid);movement(db,Number(req.params.id),id,b.stock,'variant_created',null,req.session.user_id);recordAudit(req,'variant_created',id);return id;});res.status(201).json({id});}));
+ app.post('/api/admin/products/:id/variants',csrf,write((req,res)=>{const b=req.body;requireValue(text(b.sku,100)&&b.sku.trim()&&text(b.label,200)&&b.label.trim()&&moneyInt(b.price)&&moneyInt(b.stock,1e6),'Biến thể không hợp lệ.');const id=transact(db,()=>{requireValue(db.prepare('SELECT id,image FROM products WHERE id=?').get(req.params.id),'Không tìm thấy sản phẩm.');const parent=db.prepare('SELECT image FROM products WHERE id=?').get(req.params.id);const image=b.image===undefined?parent.image:b.image;requireValue(skuImage(image),'Ảnh SKU không hợp lệ.');assertSkuAvailable(db,b.sku);const id=Number(db.prepare('INSERT INTO product_variants(product_id,sku,label,price,stock,image) VALUES(?,?,?,?,?,?)').run(req.params.id,normalizeSku(b.sku),b.label.trim(),b.price,b.stock,image).lastInsertRowid);movement(db,Number(req.params.id),id,b.stock,'variant_created',null,req.session.user_id);recordAudit(req,'variant_created',id);return id;});res.status(201).json({id});}));
  const updateVariant=write((req,res)=>{
   const b=req.body,patch=req.method==='PATCH';
   requireValue(b&&typeof b==='object'&&!Array.isArray(b),'Biến thể không hợp lệ.');
-  if(patch)requireValue(Object.keys(b).every(key=>['revision','label','price','active'].includes(key)),'Điều chỉnh tồn kho ở mục Kho & biến thể.');
+  if(patch)requireValue(Object.keys(b).every(key=>['revision','label','price','active','image'].includes(key)),'Điều chỉnh tồn kho ở mục Kho & biến thể.');
   transact(db,()=>{
    const v=db.prepare('SELECT * FROM product_variants WHERE id=?').get(req.params.id);
    requireValue(v,'Không tìm thấy biến thể.',404);
    assertRevision(b.revision,v.revision);if(!patch)assertRevision(b.stock_revision,v.stock_revision);
    const updated=patch?{...v,...b}:b;
    requireValue(text(updated.label,200)&&updated.label.trim()&&moneyInt(updated.price)&&moneyInt(updated.stock,1e6)&&[0,1].includes(updated.active),'Biến thể không hợp lệ.');
-   db.prepare('UPDATE product_variants SET label=?,price=?,stock=?,active=? WHERE id=?').run(updated.label.trim(),updated.price,updated.stock,updated.active,v.id);
+   const image=updated.image===undefined?v.image:updated.image;requireValue(skuImage(image),'Ảnh SKU không hợp lệ.');
+   db.prepare('UPDATE product_variants SET label=?,price=?,stock=?,active=?,image=? WHERE id=?').run(updated.label.trim(),updated.price,updated.stock,updated.active,image,v.id);
    if(v.stock!==updated.stock)movement(db,v.product_id,v.id,updated.stock-v.stock,'variant_edit',null,req.session.user_id);
-   recordAudit(req,'variant_updated',v.id,JSON.stringify({before:{price:v.price,stock:v.stock,active:v.active,label:v.label},after:{price:updated.price,stock:updated.stock,active:updated.active,label:updated.label.trim()}}));
+   recordAudit(req,'variant_updated',v.id,JSON.stringify({before:{price:v.price,stock:v.stock,active:v.active,label:v.label,image:v.image},after:{price:updated.price,stock:updated.stock,active:updated.active,label:updated.label.trim(),image}}));
   });res.json({ok:true});
  });
  app.put('/api/admin/variants/:id',csrf,updateVariant);

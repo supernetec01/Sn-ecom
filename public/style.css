@@ -1041,3 +1041,9 @@ button.secondary.is-pending:after, button.primary.light.is-pending:after {
   .announcement .wrap > span { font-size: 10px; line-height: 1.5; }
   .language-control select { max-width: 115px; font-size: 12px; min-height: 36px; }
 }
+.variant-options { display:flex;flex-wrap:wrap;gap:10px; }
+.variant-options button { display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;gap:6px 10px;max-width:100%;padding:8px 12px;border:1px solid #cbd8dc;border-radius:10px;background:white;text-align:left;font-size:13px; }
+.variant-options button img { width:42px;height:42px;object-fit:cover;border-radius:6px;grid-row:span 2; }
+.variant-options button small { color:#7d8c94;font-size:11px; }
+.variant-options button[aria-pressed=true] { border-color:var(--navy);background:#f0f7fa;box-shadow:0 0 0 1px var(--navy); }
+.variant-options button:focus-visible { outline:3px solid var(--blue);outline-offset:3px; }

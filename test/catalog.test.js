@@ -73,7 +73,7 @@ test('Legacy migration preserves all records and settings; explicit seeding enri
     const before = db.prepare('SELECT * FROM products ORDER BY id').all().map(row => ({ ...row }));
     db.close();
     db = openStore(dir);
-    assert.deepEqual(db.prepare('SELECT * FROM products ORDER BY id').all().map(({ details, revision, stock_revision, ...row }) => row), before);
+    assert.deepEqual(db.prepare('SELECT * FROM products ORDER BY id').all().map(({ details, revision, stock_revision, legacy_variant_id, ...row }) => row), before);
     let settings = JSON.parse(db.prepare('SELECT value FROM settings').get().value);
     assert.equal(settings.heroTitle, 'Nội dung riêng của cửa hàng');
     assert.equal(settings.shippingFee, 47000);
@@ -85,8 +85,8 @@ test('Legacy migration preserves all records and settings; explicit seeding enri
     settings.editorial.story.title = 'Câu chuyện đã biên tập';
     db.prepare('UPDATE settings SET value=?').run(JSON.stringify(settings));
     assert.deepEqual(seedDemoCatalog(db), { added: sampleCatalog.length - legacySamples.length, enriched: 2, preserved: 2, skipped: 0 });
-    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=1').get() }, { ...before[0], details: '{}', revision: 0, stock_revision: 0 });
-    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=3').get() }, { ...before[2], details: '{}', revision: 0, stock_revision: 0 });
+    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=1').get() }, { ...before[0], details: '{}', revision: 0, stock_revision: 0, legacy_variant_id: null });
+    assert.deepEqual({ ...db.prepare('SELECT * FROM products WHERE id=3').get() }, { ...before[2], details: '{}', revision: 0, stock_revision: 0, legacy_variant_id: null });
     const upgraded = readProduct(db.prepare('SELECT * FROM products WHERE id=2').get());
     assert.equal(upgraded.details.sku, 'SN-KT-001');
     assert.equal(upgraded.price, before[1].price);

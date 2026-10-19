@@ -23,7 +23,8 @@
     "test:admin": "node scripts/admin-smoke.mjs",
     "test:storefront": "node scripts/storefront-smoke.mjs",
     "test:navigation": "node scripts/navigation-smoke.mjs",
-    "test:staff": "node scripts/staff-smoke.mjs"
+    "test:staff": "node scripts/staff-smoke.mjs",
+    "test:skus": "node scripts/sku-smoke.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

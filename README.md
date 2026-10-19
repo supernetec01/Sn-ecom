@@ -48,6 +48,8 @@ Các tác vụ đã ở môi trường tách biệt: dùng checkout hiện có, 
 
 ## Nội dung quản trị
 
+Sản phẩm hỗ trợ nhiều màu/SKU ngay trong form thêm/sửa, mỗi SKU có ảnh, giá và tồn riêng. Khách chọn màu sẽ đổi ảnh; giỏ và đơn giữ đúng SKU. Xem [hướng dẫn nhập SKU và ảnh](docs/product-skus.md).
+
 Mở **Quản trị → Chức năng & thiết lập** để biết các mục đang trống vì thiếu dữ liệu, chưa cấu hình hay chưa tích hợp. Xem [rà soát chức năng và hướng xử lý](docs/feature-audit.md). Admin cấp/đặt lại mật khẩu nhân viên; nhân viên mới nhận mật khẩu phải đặt mật khẩu riêng trước khi làm việc. Nhóm Nhân viên/Khách hàng đã được tách trong quản lý tài khoản.
 
 Trang quản trị mới dùng thanh bên theo nhóm công việc, bảng tìm kiếm/lọc và biểu mẫu từng mục; quản lý tài khoản, khóa tài khoản và sáu vai trò. Xem [hướng dẫn sử dụng và phân quyền](docs/admin-guide.md). `npm run test:admin` kiểm tra trực tiếp giao diện với DB tạm.

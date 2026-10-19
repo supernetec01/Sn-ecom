@@ -26,6 +26,9 @@ jobs:
           - label: Chromium admin smoke
             command: test:admin
             browser: true
+          - label: Chromium SKU colors and images
+            command: test:skus
+            browser: true
           - label: Chromium staff lifecycle
             command: test:staff
             browser: true
@@ -55,6 +58,7 @@ jobs:
         run: npm run "${{ matrix.command }}"
         env:
           BROWSER_SCREENSHOT: ${{ github.workspace }}/test-results/commerce.png
+          SKU_SCREENSHOT: ${{ github.workspace }}/test-results/skus.png
           ADMIN_SCREENSHOT: ${{ github.workspace }}/test-results/admin.png
           LANGUAGE_SCREENSHOT: ${{ github.workspace }}/test-results/languages.png
           NAVIGATION_SCREENSHOT: ${{ github.workspace }}/test-results/navigation.png

@@ -1,5 +1,5 @@
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const snapshotFields = ['price', 'stock', 'active', 'sku', 'label', 'status'];
+const snapshotFields = ['price', 'stock', 'active', 'sku', 'label', 'status', 'image'];
 const detailFields = ['active', 'from', 'status', 'fromRole', 'role', 'disabled'];
 const scalar = value => typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value)) || (typeof value === 'string' && value.length <= 500);
 function safeDetails(value) {

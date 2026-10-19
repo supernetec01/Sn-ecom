@@ -185,3 +185,16 @@
 .admin-feature-grid button { margin-top: auto; align-self: start; }
 #required-password { margin: 25px 0; }
 @media(max-width:1050px) { .admin-feature-grid { grid-template-columns: 1fr; } }
+.sku-editor-heading { display:flex;align-items:start;justify-content:space-between;gap:18px;flex-wrap:wrap; }
+.sku-editor-heading .muted { margin:8px 0 0; }
+[data-sku-rows] { display:grid;gap:18px;min-width:0; }
+.sku-editor-row { border:1px solid #d6e2e9;border-radius:12px;padding:18px;min-width:0; }
+.sku-editor-row legend { color:var(--navy);font-weight:600;padding:0 8px;font-size:15px; }
+.sku-editor-layout { display:grid;grid-template-columns:minmax(140px,1fr) minmax(0,2fr);gap:20px; }
+.sku-editor-photo { display:grid;align-content:start;gap:12px;min-width:0; }
+.sku-editor-photo img { width:100%;max-height:170px;aspect-ratio:1;object-fit:contain;border-radius:10px;background:#f5f7f8; }
+.sku-editor-photo img[hidden],[data-sku-active][hidden] { display:none; }
+.sku-editor-photo input[type=file] { width:100%;font-size:12px; }
+.sku-editor-stock { font-size:13px;line-height:1.8;margin:0;align-self:center; }
+.sku-editor-actions { display:flex;gap:12px;justify-content:end;margin-top:16px; }
+@media(max-width:600px) { .sku-editor-layout,.sku-editor-layout .settings-grid { grid-template-columns:1fr; }.sku-editor-photo img { width:130px; }.sku-editor-row { padding:14px; } }

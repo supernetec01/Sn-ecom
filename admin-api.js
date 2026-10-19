@@ -42,7 +42,7 @@ export function installAdminApi(app, { db, auth, csrf, permit, settings, validat
   }));
   app.get('/api/admin/system', permit('settings.manage'), (_req, res) => res.json(systemStatus(db)));
   app.get('/api/admin/dashboard', permit('dashboard.read'), (req, res) => {
-    const product = db.prepare('SELECT COUNT(*) AS total,SUM(CASE WHEN stock<=5 THEN 1 ELSE 0 END) AS lowStock FROM products').get();
+    const product = db.prepare('SELECT COUNT(*) AS total,SUM(CASE WHEN COALESCE((SELECT SUM(CASE WHEN v.active=1 THEN v.stock ELSE 0 END) FROM product_variants v WHERE v.product_id=p.id),p.stock)<=5 THEN 1 ELSE 0 END) AS lowStock FROM products p').get();
     const order = db.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending,COALESCE(SUM(CASE WHEN status='completed' THEN total ELSE 0 END),0) AS revenue FROM orders").get();
     res.json({ products: product.total, lowStock: product.lowStock || 0, orders: order.total, pending: order.pending || 0, revenue: order.revenue, recentOrders: db.prepare('SELECT id,recipient,total,status,created FROM orders ORDER BY id DESC LIMIT 5').all() });
   });

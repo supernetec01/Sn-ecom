@@ -1,3 +1,4 @@
+import { saveSkuOptions } from './sku-options.js';
 import sharp from 'sharp';
 import { assertRevision } from './concurrency.js';
 import { assertSkuAvailable, normalizeSku, productVariants } from './catalog.js';
@@ -128,13 +129,14 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
    const id=Number(db.prepare('INSERT INTO products(name,category,description,price,stock,image,active,details) VALUES(?,?,?,?,?,?,?,?)').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,JSON.stringify(p.details??{})).lastInsertRowid);
    movement(db,id,null,p.stock,'product_created',null,req.session.user_id);
    audit(db,req.session.user_id,'product_created',id,JSON.stringify({after:{price:p.price,stock:p.stock,active:p.active,sku:p.details?.sku||''}}));
+   if(p.skus!==undefined)saveSkuOptions(db,id,p.skus,req.session.user_id,{creating:true});
    return id;
   });
   res.status(201).json({id});
  }));
  const updateProduct=catalogWrite((req,res)=>{
   const patch=req.method==='PATCH',body=req.body;
-  if(patch&&(!record(body)||Object.keys(body).some(key=>!['revision','name','category','description','price','image','active','details'].includes(key))))return fail(res,'Chỉ sửa thông tin sản phẩm; điều chỉnh số lượng tại mục Kho & biến thể.');
+  if(patch&&(!record(body)||Object.keys(body).some(key=>!['revision','name','category','description','price','image','active','details','skus'].includes(key))))return fail(res,'Chỉ sửa thông tin sản phẩm; điều chỉnh số lượng tại mục Kho & biến thể.');
   transact(db,()=>{
    const previous=db.prepare('SELECT * FROM products WHERE id=?').get(req.params.id);
    if(!previous)throw Object.assign(Error('Không tìm thấy sản phẩm.'),{status:404});
@@ -147,6 +149,7 @@ export function createApp(db=openStore(), { translation = {} } = {}) {
    db.prepare('UPDATE products SET name=?,category=?,description=?,price=?,stock=?,image=?,active=?,details=COALESCE(?,details) WHERE id=?').run(p.name,p.category,p.description,p.price,p.stock,p.image,p.active,p.details===undefined?null:JSON.stringify(p.details),previous.id);
    if(previous.stock!==p.stock)movement(db,previous.id,null,p.stock-previous.stock,'admin_edit',null,req.session.user_id);
    audit(db,req.session.user_id,'product_update',previous.id,JSON.stringify({before:{price:previous.price,stock:previous.stock,active:previous.active,sku:normalizeSku(JSON.parse(previous.details).sku)},after:{price:p.price,stock:p.stock,active:p.active,sku:p.details===undefined?normalizeSku(JSON.parse(previous.details).sku):p.details.sku||''}}));
+   if(body.skus!==undefined)saveSkuOptions(db,previous.id,body.skus,req.session.user_id);
   });
   res.json({ok:true});
  });

@@ -43,12 +43,16 @@ export function migrateCommerce(db) {
  CREATE INDEX IF NOT EXISTS idx_outbox_status ON notification_outbox(status,id);
  `);
  for(const table of ['orders','addresses'])for(const name of ['country','province_code','province_name','ward_code','ward_name','address_line','address_version'])add(table,name,"TEXT NOT NULL DEFAULT ''");
+ const hadVariantImage=db.prepare('PRAGMA table_info(product_variants)').all().some(c=>c.name==='image');
+ add('product_variants','image',"TEXT NOT NULL DEFAULT ''");
+ add('products','legacy_variant_id','INTEGER REFERENCES product_variants(id)');
+ if(!hadVariantImage)db.exec("UPDATE product_variants SET image=COALESCE((SELECT image FROM products WHERE products.id=product_variants.product_id),'')");
  // Database triggers cover every writer, including checkout, release, CSV,
  // category renames and legacy endpoints. Revisions also detect stock ABA.
- for (const [table, fields] of [['products', ['name','category','description','price','image','active','details']], ['product_variants', ['sku','label','price','active']]]) {
+ for (const [table, fields] of [['products', ['name','category','description','price','image','active','details','legacy_variant_id']], ['product_variants', ['sku','label','price','active','image']]]) {
   add(table, 'revision', 'INTEGER NOT NULL DEFAULT 0');
   add(table, 'stock_revision', 'INTEGER NOT NULL DEFAULT 0');
-  db.exec(`CREATE TRIGGER IF NOT EXISTS ${table}_content_revision AFTER UPDATE OF ${fields.join(',')} ON ${table}
+  db.exec(`DROP TRIGGER IF EXISTS ${table}_content_revision; CREATE TRIGGER ${table}_content_revision AFTER UPDATE OF ${fields.join(',')} ON ${table}
    WHEN ${fields.map(field => `OLD.${field} IS NOT NEW.${field}`).join(' OR ')}
    BEGIN UPDATE ${table} SET revision=revision+1 WHERE id=NEW.id; END;
    CREATE TRIGGER IF NOT EXISTS ${table}_stock_revision AFTER UPDATE OF stock ON ${table}
@@ -76,9 +80,10 @@ export function movement(db,id,variant,delta,reason,order=null,actor=null){db.pr
 export function releaseStock(db,o,actor,reason){
  if(o.stock_released)return;
  for(const i of JSON.parse(o.items)){
-  if(i.variant_id)db.prepare('UPDATE product_variants SET stock=stock+? WHERE id=?').run(i.quantity,i.variant_id);
+  const variantId=i.variant_id||db.prepare('SELECT legacy_variant_id FROM products WHERE id=?').get(i.id)?.legacy_variant_id;
+  if(variantId)db.prepare('UPDATE product_variants SET stock=stock+? WHERE id=?').run(i.quantity,variantId);
   else db.prepare('UPDATE products SET stock=stock+? WHERE id=?').run(i.quantity,i.id);
-  movement(db,i.id,i.variant_id,i.quantity,reason,o.id,actor);
+  movement(db,i.id,variantId,i.quantity,reason,o.id,actor);
  }
  db.prepare('UPDATE orders SET stock_released=1 WHERE id=?').run(o.id);
 }
