@@ -125,6 +125,8 @@ bash database/postgresql/verify.sh
 
 Yêu cầu Docker hoạt động và tải được image PostgreSQL chính thức. Script pin image bằng digest, tạo container riêng không có network/cổng publish, tạo DB mới, áp schema, chạy **25 kiểm tra ràng buộc + 2 kịch bản concurrency**, rồi xóa container của chính nó. Local socket trust chỉ dùng trong container cô lập này; không dùng cách xác thực này cho server triển khai. Kiểm tra hiện tại: **27/27 đạt**. Các fixture của `verify.sql` rollback; các fixture concurrency nằm trong container dùng một lần.
 
+Script dùng Bash và các công cụ chuẩn của Linux (`awk`, `grep`, Docker), không cần cài ripgrep (`rg`). Bản sửa ngày 20/10/2026 đã tái hiện môi trường thiếu `rg`: bản cũ dừng với exit 1 sau các kiểm tra ràng buộc, bản sửa đạt đủ 27 kiểm tra trong cùng môi trường. Schema và các khẳng định SQL được giữ nguyên. GitHub Actions lưu log trong artifact **PostgreSQL verification logs**; lỗi SQL vẫn làm job thất bại, đồng thời giữ log container/session trước khi dọn dẹp. Đã kiểm chứng bằng bản sao fixture cố ý gây lỗi SQL (exit 3 được giữ qua pipeline ghi log).
+
 Các lỗi bị chặn gồm email chưa chuẩn hóa/trùng, orphan SKU, SKU trùng hoa thường, tồn âm/giữ quá tồn, tổng đơn sai/thiếu lines, sửa giá snapshot, key trùng, thu vượt đơn, callback trùng/chưa xác minh, hoàn vượt thu, xóa ledger, gắn shipment sang đơn khác, nhập hàng hư vào tồn bán và sửa audit. Hai session tranh đơn vị tồn cuối chỉ một thành công; hai receipt cùng giá trị đơn chỉ một commit.
 
 Trong tác vụ còn có DB thiết kế `supernet_design` trên container `sn-ecom-db-design`, cùng schema nhưng không gắn với ứng dụng. Truy vấn bằng socket:

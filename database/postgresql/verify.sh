@@ -6,8 +6,20 @@ image='postgres@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca
 container="sn-schema-${RANDOM}-$$"
 scratch=$(mktemp -d /tmp/sn-schema-XXXXXX)
 cleanup() {
+  local status=$?
+  if [[ "$status" != 0 ]]; then
+    echo 'FAIL: PostgreSQL verification failed; isolated container and session logs follow.' >&2
+    docker logs "$container" >&2 || true
+    for log in "$scratch"/*; do
+      if [[ -f "$log" ]]; then
+        printf '\nSession log: %s\n' "${log##*/}" >&2
+        cat "$log" >&2
+      fi
+    done
+  fi
   docker rm -f "$container" >/dev/null 2>&1 || true
   rm -rf "$scratch"
+  return "$status"
 }
 trap cleanup EXIT
 docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image"
@@ -54,7 +66,8 @@ reserve_one >"$scratch/stock-1" & first=$!
 reserve_one >"$scratch/stock-2" & second=$!
 wait "$first"
 wait "$second"
-test "$(rg '^reserved$' "$scratch/stock-1" "$scratch/stock-2" --no-heading --no-filename | wc -l)" -eq 1
+# Use the runner's standard tools; ripgrep is not a prerequisite for this check.
+test "$(awk '$0 == "reserved" { count++ } END { print count+0 }' "$scratch/stock-1" "$scratch/stock-2")" -eq 1
 test "$(psql_test -c 'SELECT reserved FROM supernet.inventory_balances WHERE warehouse_id=200 AND variant_id=200')" -eq 1
 echo 'PASS: concurrent checkouts cannot reserve the same last unit'
 
@@ -75,9 +88,9 @@ record_payment 'concurrent-2' >"$scratch/payment-2" 2>&1 & second=$!
 first_status=0; wait "$first" || first_status=$?
 second_status=0; wait "$second" || second_status=$?
 if [[ "$first_status" == 0 && "$second_status" != 0 ]]; then
-  rg -q 'payment exceeds order total' "$scratch/payment-2"
+  grep -Fq 'payment exceeds order total' "$scratch/payment-2"
 elif [[ "$second_status" == 0 && "$first_status" != 0 ]]; then
-  rg -q 'payment exceeds order total' "$scratch/payment-1"
+  grep -Fq 'payment exceeds order total' "$scratch/payment-1"
 else
   cat "$scratch/payment-1" "$scratch/payment-2"
   exit 1

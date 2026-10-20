@@ -76,4 +76,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: bash database/postgresql/verify.sh
+      - name: Verify PostgreSQL schema, inventory and payment concurrency
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          bash database/postgresql/verify.sh 2>&1 | tee test-results/postgresql.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PostgreSQL verification logs
+          path: test-results/postgresql.log
+          if-no-files-found: ignore
+          retention-days: 7
