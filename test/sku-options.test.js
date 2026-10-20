@@ -52,6 +52,25 @@ test('Converting a single SKU uses live stock and old pending-order cancellation
  assert.equal((await request('/orders/'+old.data.id+'/cancel',{method:'POST',ctx:customer,body:{}})).status,400);assert.equal(db.prepare('SELECT stock FROM products WHERE id=?').get(p.id).stock,0);
 });
 
+test('Public catalog finds active SKU codes and colors once per product and keeps filters and hidden SKUs private',async t=>{
+ const {request,admin,product,db,variants}=await fixture(t);
+ const body=product();body.skus[0].label='Xanh ngọc riêng';body.skus[1].label='Xanh ngọc riêng';
+ const created=await request('/admin/products',{method:'POST',ctx:admin,body});assert.equal(created.status,201);
+ const id=created.data.id,vs=variants(id);
+ const search=async(q,filters='')=>(await request('/catalog?q='+encodeURIComponent(q)+filters)).data;
+ for(const q of ['CUP-1','xanh ngoc rieng']){
+  const result=await search(q);assert.equal(result.total,1);assert.deepEqual(result.items.map(p=>p.id),[id]);
+ }
+ assert.equal((await search('CUP-1','&category='+encodeURIComponent('Không có'))).total,0);
+ assert.equal((await search('CUP-1','&price=over500')).total,0);
+ assert.equal((await search("' OR 1=1 --")).total,0);
+ db.prepare('UPDATE product_variants SET active=0 WHERE id=?').run(vs[1].id);
+ assert.equal((await search('CUP-1')).total,0);
+ assert.equal((await search('xanh ngoc rieng')).total,1);
+ db.prepare('UPDATE products SET active=0 WHERE id=?').run(id);
+ assert.equal((await search('CUP-0')).total,0);
+});
+
 test('SKU metadata saves preserve concurrent sales, reject stale revisions and never overwrite stock',async t=>{
  const f=await fixture(t);const {request,admin,customer,db,product,variants,skuBody,shipping,snapshot}=f;
  const created=await request('/admin/products',{method:'POST',ctx:admin,body:product()}),id=created.data.id;

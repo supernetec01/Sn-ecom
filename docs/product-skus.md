@@ -17,6 +17,8 @@ Mã SKU không được trùng trong cùng sản phẩm hoặc với SKU sản p
 
 Mở **Sửa** ở sản phẩm để xem/sửa trực tiếp tất cả SKU, gồm mã, tên màu, ảnh, giá và trạng thái. Không cần sang mục Kho chỉ để thêm màu hoặc ảnh.
 
+Nếu đang ở **Kho & biến thể**, mở tên sản phẩm rồi chọn **Quản lý SKU / thêm màu**. Nút này mở cùng form sản phẩm; khi chuyển từ một SKU sang nhiều màu, tồn hiện có được giữ ở dòng đầu. Mục kho không còn form thêm phiên bản riêng dễ bỏ qua SKU gốc.
+
 - Tồn ban đầu nhập cho SKU mới. Với SKU đã lưu, form chỉ hiển thị tồn lúc mở; vào **Kho & biến thể** để điều chỉnh tăng/giảm và ghi lý do.
 - Khách mua trong lúc admin sửa ảnh hoặc tên màu: lưu nội dung không khôi phục số tồn cũ.
 - Nếu người khác đã sửa cùng SKU hoặc thay danh sách SKU khi bạn đang mở form, API trả xung đột để đối chiếu lại, không tự ghi đè.
@@ -36,6 +38,8 @@ Nếu sản phẩm đã có biến thể từ phiên bản cũ, giao diện nạ
 ## Khi khách mua
 
 - Sản phẩm có nhiều màu: khách chọn từ danh sách hoặc các nút ảnh màu. Ảnh lớn, mã SKU, giá và tồn cập nhật theo lựa chọn.
+- Ô tìm kiếm cửa hàng nhận cả mã SKU và tên màu đang bán, không phân biệt dấu tiếng Việt. Nhiều màu khớp vẫn chỉ hiện một sản phẩm; bộ lọc giá/danh mục tiếp tục áp dụng.
+- Nút thêm giỏ trên thẻ sản phẩm có nhiều SKU mở đúng trang sản phẩm để chọn màu, kể cả ở phần gợi ý dưới một sản phẩm khác. Lựa chọn màu của sản phẩm đang xem không được dùng cho thẻ khác.
 - Sản phẩm chỉ có một biến thể đang bán: biến thể được chọn sẵn; khách vẫn có thể đổi lựa chọn nếu có thêm màu.
 - Màu hết hàng vẫn xem được ảnh, nút thêm giỏ bị khóa. SKU ngừng bán không xuất hiện như lựa chọn mua.
 - Giỏ hiển thị ảnh và tên màu/SKU đã chọn. Máy chủ tự lấy giá, ảnh và tồn; dữ liệu giả mạo từ trình duyệt không quyết định đơn.

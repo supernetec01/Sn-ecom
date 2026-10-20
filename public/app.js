@@ -116,7 +116,11 @@ function add(id, quantity = 1, source = null) {
   const product = products.find(item => item.id === id);
   if (!product?.stock) return toast('Sản phẩm đã hết hàng.');
   let variant_id;
-  if (product.has_variants || product.variants?.length) { variant_id = Number($('#variant-picker')?.value); if (!variant_id) { location.hash = 'product/'+id; return toast('Chọn phiên bản trước khi thêm vào giỏ.'); } }
+  if (product.has_variants || product.variants?.length) {
+    const selected = source?.id === 'detail-add' && Number(source.dataset.productId) === id ? Number($('#variant-picker')?.value) : 0;
+    variant_id = product.variants?.find(variant => variant.id === selected)?.id;
+    if (!variant_id) { location.hash = 'product/'+id; return toast('Chọn phiên bản trước khi thêm vào giỏ.'); }
+  }
   const stock = variant_id ? product.variants.find(v=>v.id===variant_id)?.stock || 0 : product.stock;
   const item = cart.find(line => line.id === id && (line.variant_id||0)===(variant_id||0));
   if (!Number.isSafeInteger(quantity) || quantity < 1 || (item?.quantity || 0) + quantity > Math.min(stock, 99)) return toast('Số lượng vượt quá tồn kho hoặc giới hạn 99 sản phẩm.');
@@ -308,7 +312,7 @@ async function submit(form, action) {
 }
 async function loadProducts(){const first=(await api('/catalog?limit=16')).items;const missing=[...new Set(cart.map(l=>l.id))].filter(id=>!first.some(p=>p.id===id));const extra=await Promise.all(missing.map(id=>api('/products/'+id).catch(()=>null)));return first.concat(extra.filter(Boolean));}
 async function refresh() { [config, products, commerce, me] = await Promise.all([api('/settings'), loadProducts(), api('/commerce'), api('/me')]); await render(); }
-function commerceContext() { return { api, esc, money, me, config, commerce, products, cart, saveCart, toast, submit, render, refresh, productCard, orderCard, reloadUser, imageChanged: image=>motion.imageChanged(image) }; }
+function commerceContext() { return { api, esc, money, me, config, commerce, products, cart, saveCart, toast, submit, render, refresh, productCard, orderCard, editProduct, reloadUser, imageChanged: image=>motion.imageChanged(image) }; }
 let generation = 0, lastRenderedRoute, catalogPageNumber=1;
 async function render({ settings } = {}) {
   const current = ++generation;

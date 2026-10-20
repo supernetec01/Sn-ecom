@@ -26,9 +26,10 @@ export function installCommerce(app,db,{auth,csrf,admin,settings,loginLimit}) {
   const q=normalize(String(req.query.q||'').slice(0,200)),category=String(req.query.category||'');
   const limit=Math.min(48,Math.max(1,Math.floor(Number(req.query.limit)||16))),page=Math.min(100000,Math.max(1,Math.floor(Number(req.query.page)||1)));
   const priceRange=String(req.query.price||'');const range={under200:'effective_price<200000','200to500':'effective_price BETWEEN 200000 AND 500000',over500:'effective_price>500000'}[priceRange]||'1=1';
-  const source="(SELECT p.*,COALESCE((SELECT MIN(v.price) FROM product_variants v WHERE v.product_id=p.id AND v.active=1),(SELECT MIN(v.price) FROM product_variants v WHERE v.product_id=p.id),p.price) effective_price FROM products p)";
-  const where="active=1 AND (?='' OR sn_normalize(name || ' ' || description || ' ' || details) LIKE ?) AND (?='' OR category=?) AND "+range;
-  const params=[q,'%'+q.replaceAll('%','').replaceAll('_','')+'%',category,category];
+  const source="(SELECT p.*,COALESCE((SELECT MIN(v.price) FROM product_variants v WHERE v.product_id=p.id AND v.active=1),(SELECT MIN(v.price) FROM product_variants v WHERE v.product_id=p.id),p.price) effective_price FROM products p) catalog_product";
+  const where="active=1 AND (?='' OR sn_normalize(name || ' ' || description || ' ' || details) LIKE ? OR EXISTS(SELECT 1 FROM product_variants v WHERE v.product_id=catalog_product.id AND v.active=1 AND sn_normalize(v.sku || ' ' || v.label) LIKE ?)) AND (?='' OR category=?) AND "+range;
+  const pattern='%'+q.replaceAll('%','').replaceAll('_','')+'%';
+  const params=[q,pattern,pattern,category,category];
   const sort={priceAsc:'effective_price ASC,id DESC',priceDesc:'effective_price DESC,id DESC',name:'name ASC,id DESC'}[req.query.sort]||'id DESC';
   res.json({items:db.prepare(`SELECT * FROM ${source} WHERE ${where} ORDER BY ${sort} LIMIT ? OFFSET ?`).all(...params,limit,(page-1)*limit).map(p=>{const {effective_price,...row}=p;return decorateProduct(db,row,readProduct);}),total:db.prepare(`SELECT count(*) n FROM ${source} WHERE ${where}`).get(...params).n,page,limit});
  }));
