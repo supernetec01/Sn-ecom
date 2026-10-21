@@ -70,6 +70,23 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  deployment:
+    name: Production Docker package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: docker build -t supernet-store:local .
+      - run: npm run test:deployment
+      - name: Validate VPS configuration
+        run: |
+          cp deploy/.env.example deploy/.env
+          docker compose -f deploy/compose.yaml config --quiet
+          docker run --rm -e SITE_DOMAIN=supernet.vn -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   database:
     name: PostgreSQL schema and concurrency
     runs-on: ubuntu-latest

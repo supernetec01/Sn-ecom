@@ -1,0 +1,50 @@
+# Linux VPS: both services use the host network so Node can trust ONLY loopback.
+# Node listens on 127.0.0.1; only Caddy exposes the website on ports 80/443.
+name: supernet
+services:
+  app:
+    build: ..
+    image: supernet-store:local
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 127.0.0.1
+      PORT: '3000'
+      TRUST_PROXY: loopback
+      APP_ORIGIN: https://${SITE_DOMAIN:?Set SITE_DOMAIN in deploy/.env}
+      DATA_DIR: /var/lib/supernet
+    volumes:
+      - shop_data:/var/lib/supernet
+      - shop_backups:/backups
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set SITE_DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - tls_data:/data
+      - tls_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+volumes:
+  shop_data:
+  shop_backups:
+  tls_data:
+  tls_config:

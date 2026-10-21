@@ -19,6 +19,8 @@ Yêu cầu **Node.js 24 trở lên** vì ứng dụng sử dụng module tích h
 
 ## Demo miễn phí để chia sẻ
 
+Để vận hành trên tên miền riêng, dùng [hướng dẫn triển khai VPS, HTTPS và chuyển dữ liệu](docs/deployment.md). Repo có Dockerfile, cấu hình Caddy/Compose và kiểm tra dữ liệu tồn tại sau khi tạo lại container. Bản demo tạm bên dưới cần giữ máy cá nhân đang bật.
+
 Chạy trên máy Windows và dùng Cloudflare Quick Tunnel để có link HTTPS miễn phí. Sau khi cài cloudflared, tạo admin riêng bằng `npm.cmd run demo:admin`, rồi chạy **`npm.cmd run demo`**. Công cụ tự cấu hình địa chỉ website, kiểm tra link công khai và in link để chia sẻ; Ctrl+C dừng cả website và tunnel. Dữ liệu nằm riêng trong `data/demo/`, không thay DB website hiện có. Xem [các bước PowerShell và cách xử lý lỗi](docs/free-demo.md).
 
 ## Cập nhật website đang sử dụng trên Windows
